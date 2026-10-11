@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nsight-agent"
+version = "0.1.0"
+description = "Evidence-backed Nsight Systems tools for Codex over MCP"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = ["mcp>=1.27,<2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "build>=1.2", "ruff>=0.11"]
+
+[project.scripts]
+nsight-agent = "nsight_agent.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requires a real Nsight installation and Linux capture"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [".cache"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
