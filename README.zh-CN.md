@@ -4,6 +4,8 @@
 
 第一次使用请先阅读 [中文入门指南](docs/GETTING_STARTED.zh-CN.md)：从零安装、验证连接、十八个工具的提问示例、故障排查、更新和卸载。
 
+下载 [v1.1.0 正式版](https://github.com/liubingjun1207/nsight-agent/releases/tag/v1.1.0)：[完整源码包（含安装脚本、样例和指南）](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/nsight_agent-1.1.0.tar.gz)、[wheel](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/nsight_agent-1.1.0-py3-none-any.whl)、[SHA256SUMS](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/SHA256SUMS)。十八个工具需要 v1.1.0；旧 v1.0.0 只有十二个。
+
 [最终范围](docs/PROJECT_SCOPE.zh-CN.md) 保留 18 个 CUDA/NVTX 官方报告，并明确 v1.1 的有限扩展。[验收要求](docs/ACCEPTANCE.zh-CN.md) 分别检查数值正确性、真实模型流程和安装发布体验。
 
 让 Codex 通过 MCP 调用 **Nsight Systems 官方统计命令**，分析 CUDA kernel 执行时间、CUDA API 和内存操作。模型选择分析步骤、解释结果，原始报告交给 Nsight 处理。

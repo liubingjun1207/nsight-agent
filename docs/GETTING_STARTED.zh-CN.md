@@ -1,6 +1,8 @@
-# Nsight Agent v1.0 中文入门指南
+# Nsight Agent v1.1 中文入门指南
 
 这份指南适用于在 Windows 上，通过 Codex 分析现成的 Nsight Systems 报告。完成后，你可以直接问：“列出最耗时的十个 CUDA kernel”，由 Codex 调用工具得到可复核的统计。
+
+本指南对应 [v1.1.0 正式发布](https://github.com/liubingjun1207/nsight-agent/releases/tag/v1.1.0)，包含十八个工具。Linux 安装、本地采集、PyTorch eager 标注与可选 Compute 报告见 [扩展指南](EXTENSIONS.zh-CN.md)。v1.0.0 只有十二个工具，不能用于验证本指南的六个扩展工具。
 
 ## 1. 准备环境
 
@@ -11,21 +13,26 @@
 | Codex 本地客户端 | 按 [Codex 官方说明](https://developers.openai.com/codex/quickstart) 安装并登录；桌面客户端用于对话 | 确认能正常对话；若使用命令行管理 MCP，执行 `codex --version` |
 | 报告或公开样例 | `.nsys-rep` 或 Nsight 导出的 `.sqlite` | 本项目源代码包已包含公开样例 |
 
-分析已有报告不要求 Windows 本机有 NVIDIA GPU，也不要求安装 PyTorch。只有自行采集示例工作负载才需要 CUDA GPU 与 PyTorch。项目验证的是 Windows 阅读 Linux 报告；并不代表所有采集版本都兼容。
+分析已有报告不要求 Windows 本机有 NVIDIA GPU，也不要求安装 PyTorch。自行采集 CUDA 示例需要 NVIDIA GPU；PyTorch 算子示例还需要 CUDA-enabled PyTorch。Compute 是可选组件，阅读 `.ncu-rep` 时才需要安装；验证版本为 2026.1.0。平台和版本覆盖以 [实际验证记录](VALIDATION-v1.1.md) 为准。
 
-## 2. 安装 v1.0
+## 2. 安装 v1.1.0
 
-解压发布的源代码包 `nsight_agent-1.0.0.tar.gz`，或 GitHub 的源代码 ZIP。进入包含 `pyproject.toml` 的目录，在资源管理器地址栏输入 `powershell` 打开终端。
+第一次使用建议下载 [完整源码包 nsight_agent-1.1.0.tar.gz](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/nsight_agent-1.1.0.tar.gz)，其中包含安装脚本、公开 Systems 样例和指南。解压后进入包含 `pyproject.toml` 的目录，在资源管理器地址栏输入 `powershell` 打开终端。已有报告的用户也可下载 [wheel](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/nsight_agent-1.1.0-py3-none-any.whl)。
+
+发布页的 [SHA256SUMS](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/SHA256SUMS) 提供校验值。Windows 可用 `Get-FileHash -Algorithm SHA256 下载文件路径` 核对下载文件；Linux 可用 `sha256sum -c SHA256SUMS`。安装脚本需在解压后的完整项目中运行。
 
 执行：
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -c "import nsight_agent; print(nsight_agent.__version__)"
 .\.venv\Scripts\python.exe -m nsight_agent --doctor
 ```
 
 无需激活虚拟环境；这里始终明确使用项目的 `.venv` Python。源码包用户也可以直接执行 `powershell -File .\install.ps1`，它会完成虚拟环境创建、安装、接入和样例连接检查。
+
+版本输出应为 `1.1.0`。如果仍是旧版，请先在该 Python 环境安装新的包，再重新执行 setup；不要在另一个 Python 环境中升级。
 
 成功的检查结果应包含：
 
@@ -49,7 +56,7 @@ $env:NSIGHT_NSYS_PATH = 'C:\Program Files\NVIDIA Corporation\Nsight Systems 2025
 若只想安装 wheel，也可以在同一个虚拟环境执行：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install 'C:\你的下载目录\nsight_agent-1.0.0-py3-none-any.whl'
+.\.venv\Scripts\python.exe -m pip install --upgrade 'C:\你的下载目录\nsight_agent-1.1.0-py3-none-any.whl'
 ```
 
 wheel 不包含公开报告和指南，但包含分析 skill，可由 `--setup` 安装；第一次使用建议下载完整源代码包。
@@ -163,7 +170,7 @@ codex mcp get nsight
 {"report_id":"打开报告后返回的ID","query":{"start_ns":0,"end_ns":10000000000,"limit":10}}
 ```
 
-NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间区间与 NVTX 不能同时指定。报告 ID 仅在当前服务会话有效，重启后重新打开报告。v1.0 可用 `nsight_nvtx_summary` 发现范围，再用 `nsight_nvtx_trace` 查看 Push/Pop 实例；可直接使用返回的 `time_query`，不要把 `RangeId` 当作筛选序号。
+NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间区间与 NVTX 不能同时指定。报告 ID 仅在当前服务会话有效，重启后重新打开报告。可用 `nsight_nvtx_summary` 发现范围，再用 `nsight_nvtx_trace` 查看 Push/Pop 实例；可直接使用返回的 `time_query`，不要把 `RangeId` 当作筛选序号。
 
 统一能力入口和分析工具的提问：
 
@@ -183,7 +190,7 @@ NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间
 - CPU 侧 CUDA API 时间与 GPU kernel 执行时间是不同指标。
 - 时间/NVTX 筛选包含与范围重叠的完整事件，耗时不会裁剪到边界。
 - “没有匹配数据”不证明实际 GPU 没有活动；报告可能未采集所需事件。
-- CUDA kernel 与 PyTorch 算子不是一一对应，v1.0 不承诺框架算子归因、GPU 利用率诊断或瓶颈根因判定。
+- CUDA kernel 与 PyTorch 算子不是一一对应。v1.1 支持已记录的 eager NVTX 算子关联；嵌套范围可能重复关联 kernel。不提供未标注报告或编译/融合图的完整自动归因，也不自动判定瓶颈根因。
 
 ## 8. 常见故障
 
@@ -194,6 +201,7 @@ NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间
 | `Nsight Systems CLI not found` | 指定 `NSIGHT_NSYS_PATH`；确认指向 Systems 的 `nsys.exe`，不是 Nsight Compute 的 `ncu.exe` |
 | `missing_reports` 非空或选项不支持 | 检查 Nsight 版本；升级到已支持所需官方报告的版本，再运行 doctor |
 | Codex 中没有工具 | 检查 MCP 服务启用状态、Python 路径与配置位置；重新连接或重启客户端 |
+| 只有十二个工具，没有采集/Compute 工具 | 检查配置中 Python 的包版本，安装 v1.1.0，再执行 `--setup` 并重新连接；v1.0.0 不包含六个扩展工具 |
 | 工具启动失败 | 在终端运行相同 Python 的 `--doctor`；不要用别的 Python 检查后就认为配置正确 |
 | `MCP_CONFIG_INVALID` | 修复 `config.toml` 的 TOML 语法后重新运行 `--setup`；配置解析失败时不会改写原文件 |
 | `CACHE_IO_ERROR` | 将 `NSIGHT_CACHE_DIR` 设置为可写且空间充足的目录，检查错误中指出的文件权限，再重试 |
@@ -239,6 +247,6 @@ doctor 的 `cache_dir` 显示实际缓存路径。默认在 Windows 本地应用
 
 - [完整接口与参数](../README.md#tools)
 - [逐步演示及统计预期](DEMO.md)
-- [版本验证记录](VALIDATION.md)
+- [v1.1 版本验证记录](VALIDATION-v1.1.md)
 - [真实模型与安装验收](ACCEPTANCE.zh-CN.md)
 - [项目许可](../LICENSE)

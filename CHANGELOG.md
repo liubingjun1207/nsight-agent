@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 — unreleased
+## 1.1.0 — 2026-10-13
 
 - Add an owner-configured local Systems capture registry, bounded collection and report registration; no command/argument input through tool calls.
 - Add a Linux source installer and actual Linux container reader/collection validation.
