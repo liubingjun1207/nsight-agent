@@ -20,6 +20,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .analysis import AnalysisMixin
+from .catalog import CATALOG, CatalogMixin, ReportOptions
 
 REPORTS = {
     "kernel_summary": "cuda_gpu_kern_sum",
@@ -34,6 +35,74 @@ ALL_REPORTS = REPORTS | OPTIONAL_REPORTS
 
 class NsightError(RuntimeError):
     """An actionable error safe to surface through MCP."""
+
+    def __init__(self, message: str, *, code: str | None = None):
+        mappings = [
+            (
+                "CLI not found",
+                "NSIGHT_NOT_FOUND",
+                "Install Nsight Systems or set NSIGHT_NSYS_PATH.",
+            ),
+            (
+                "does not support",
+                "CAPABILITY_UNAVAILABLE",
+                "Call nsight_capabilities; use an available report or a compatible reader.",
+            ),
+            (
+                "Unsupported Nsight options",
+                "CAPABILITY_UNAVAILABLE",
+                "Check nsight_doctor and the installed Nsight version.",
+            ),
+            (
+                "no valid CSV",
+                "MISSING_DATA",
+                "Check capture traces and range filters; missing data is not zero activity.",
+            ),
+            (
+                "Unknown report_id",
+                "REPORT_ID_EXPIRED",
+                "Open the report again in this server session.",
+            ),
+            (
+                "expired result_id",
+                "RESULT_ID_EXPIRED",
+                "Rerun the analysis and use its new result_id.",
+            ),
+            ("changed since", "REPORT_CHANGED", "Reopen the changed report."),
+            (
+                "Expected an existing",
+                "INVALID_REPORT",
+                "Provide an existing absolute .nsys-rep or exported .sqlite path.",
+            ),
+            ("exceeded", "TIMEOUT", "Narrow the range or increase both command and tool timeouts."),
+            (
+                "Nsight failed",
+                "COMMAND_FAILED",
+                "Check the Nsight diagnostic and try the same report in the local reader.",
+            ),
+            (
+                "schema",
+                "SCHEMA_INCOMPATIBLE",
+                "Check the installed Nsight version and report columns.",
+            ),
+        ]
+        matched = next((item for item in mappings if item[0] in message), None)
+        self.code = code or (matched[1] if matched else "NSIGHT_ERROR")
+        self.recovery = (
+            matched[2]
+            if matched
+            else "Check the error detail and tool parameters; do not treat this as a zero measurement."
+        )
+        self.detail = message
+        super().__init__(f"[{self.code}] {message} Recovery: {self.recovery}")
+
+    def as_dict(self):
+        return {
+            "status": "error",
+            "code": self.code,
+            "message": self.detail,
+            "recovery": self.recovery,
+        }
 
 
 class Query(BaseModel):
@@ -72,6 +141,12 @@ class NvtxTraceQuery(Query):
     """NVTX discovery defaults to chronological order."""
 
     descending: bool = False
+
+
+class StatsQuery(Query):
+    """Use each official report's sort direction when not explicitly supplied."""
+
+    descending: bool | None = None
 
 
 def discover_nsys(explicit: str | None = None) -> Path:
@@ -115,6 +190,13 @@ def parse_csv(text: str, required: set[str] | None = None) -> tuple[list[str], l
         "Style",
         "NameTree",
         "RangeStack",
+        "Category",
+        "API Name",
+        "API Function",
+        "NVTX Range",
+        "GridXYZ",
+        "BlockXYZ",
+        "Thread Name",
     }
     for record in reader:
         if None in record or any(value is None for value in record.values()):
@@ -145,7 +227,9 @@ def time_argument(value: int | None) -> str:
     return f"{'-' if value < 0 else ''}{seconds}.{nanos:09d}s"
 
 
-def run_process(args: list[str], *, cwd: Path, env: dict, timeout: float):
+def run_process(
+    args: list[str], *, cwd: Path, env: dict, timeout: float, input_text: str | None = None
+):
     """Terminate Nsight's helper process tree as well as its launcher on timeout."""
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     with subprocess.Popen(
@@ -154,7 +238,7 @@ def run_process(args: list[str], *, cwd: Path, env: dict, timeout: float):
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        stdin=subprocess.DEVNULL,
+        stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
         text=True,
         encoding="utf-8",
         errors="replace",
@@ -163,7 +247,7 @@ def run_process(args: list[str], *, cwd: Path, env: dict, timeout: float):
         start_new_session=os.name != "nt",
     ) as process:
         try:
-            stdout, stderr = process.communicate(timeout=timeout)
+            stdout, stderr = process.communicate(input=input_text, timeout=timeout)
         except subprocess.TimeoutExpired:
             if os.name == "nt":
                 try:
@@ -200,7 +284,7 @@ def run_process(args: list[str], *, cwd: Path, env: dict, timeout: float):
     return subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
 
 
-class NsightService(AnalysisMixin):
+class NsightService(AnalysisMixin, CatalogMixin):
     def __init__(
         self, nsys: str | None = None, cache_dir: str | Path | None = None, timeout: float = 120
     ):
@@ -270,6 +354,14 @@ class NsightService(AnalysisMixin):
                     kind: name in available for kind, name in OPTIONAL_REPORTS.items()
                 },
                 "cache_dir": str(self.cache.resolve()),
+                "report_parameters": {
+                    name: re.findall(r"[:|]([a-z][a-z-]+)", tail)
+                    for name, tail in re.findall(
+                        r"^\s+([a-z][a-z0-9_]+)(.*?)\s+--", report_text, re.M
+                    )
+                },
+                "service_reports": list(CATALOG),
+                "missing_service_reports": sorted(set(CATALOG) - set(available)),
             }
             return dict(self._capabilities)
 
@@ -299,7 +391,11 @@ class NsightService(AnalysisMixin):
         if (stat.st_size, stat.st_mtime_ns) != (report.size, report.mtime_ns):
             raise NsightError("Report changed since registration; reopen it before querying.")
 
-    def _table(self, report_id: str, report_name: str, query: Query):
+    def _table(
+        self, report_id: str, report_name: str, query: Query, options: ReportOptions | None = None
+    ):
+        if report_name not in CATALOG:
+            raise NsightError("Report outside the fixed CUDA/NVTX allowlist.", code="OUT_OF_SCOPE")
         capabilities = self._capabilities or self.doctor()
         if report_name not in capabilities["reports"]:
             raise NsightError(f"Installed Nsight does not support {report_name}.")
@@ -312,6 +408,21 @@ class NsightService(AnalysisMixin):
             raise NsightError(
                 f"Unsupported Nsight options: {sorted(required - set(capabilities['options']))}"
             )
+        options = options or ReportOptions()
+        parameters = []
+        if options.annotate_nvtx:
+            parameters.append("nvtx-name")
+        if options.name_format != "demangled":
+            parameters.append(options.name_format)
+        supported = set(capabilities.get("report_parameters", {}).get(report_name, [])) & set(
+            CATALOG[report_name].parameters
+        )
+        if not set(parameters).issubset(supported):
+            raise NsightError(
+                f"Unsupported report parameters for {report_name}: {parameters}.",
+                code="CAPABILITY_UNAVAILABLE",
+            )
+        selector = report_name + "".join(":" + value for value in parameters)
         report = self.reports.get(report_id)
         if report is None:
             raise NsightError("Unknown report_id; call nsight_open_report first.")
@@ -351,7 +462,7 @@ class NsightService(AnalysisMixin):
         args = [
             "stats",
             "--report",
-            report_name,
+            selector,
             "--format",
             "csv:time=ns:bytes=B",
             "--output",
@@ -368,30 +479,7 @@ class NsightService(AnalysisMixin):
         # An empty working directory prevents shadowing NVIDIA's built-in reports.
         with tempfile.TemporaryDirectory(prefix="run-", dir=self.cache) as directory:
             stdout = self._run(args, Path(directory))
-        if report_name == "nvtx_sum":
-            required_columns = {"Range", "Style", "Total Time (ns)", "Instances"}
-        elif report_name == "nvtx_pushpop_trace":
-            required_columns = {
-                "Name",
-                "Start (ns)",
-                "End (ns)",
-                "Duration (ns)",
-                "PID",
-                "TID",
-                "RangeId",
-                "ParentId",
-                "Lvl",
-            }
-        elif report_name == "cuda_gpu_trace":
-            required_columns = {"Name", "Start (ns)", "Duration (ns)", "GrdX"}
-        elif report_name == "cuda_gpu_mem_size_sum":
-            required_columns = {"Operation", "Total (B)"}
-        else:
-            required_columns = {
-                "Operation" if report_name == "cuda_gpu_mem_time_sum" else "Name",
-                "Total Time (ns)",
-            }
-        columns, rows = parse_csv(stdout, required_columns)
+        columns, rows = parse_csv(stdout, set(CATALOG[report_name].required))
         return columns, rows, capabilities, args
 
     def query(self, report_id: str, kind: str, query: Query | None = None) -> dict:
@@ -399,35 +487,42 @@ class NsightService(AnalysisMixin):
             return self._remember(self._query_result(report_id, kind, query))
 
     def _query_result(
-        self, report_id: str, kind: str, query: Query | None = None, *, paginate: bool = True
+        self,
+        report_id: str,
+        kind: str,
+        query: Query | None = None,
+        *,
+        paginate: bool = True,
+        options: ReportOptions | None = None,
     ) -> dict:
-        if kind not in ALL_REPORTS:
+        if kind not in ALL_REPORTS and kind not in CATALOG:
             raise NsightError("Unsupported analysis kind.")
         query = query or (NvtxTraceQuery() if kind == "nvtx_trace" else Query())
         with self._lock:
-            report_name = ALL_REPORTS[kind]
-            columns, rows, capabilities, args = self._table(report_id, report_name, query)
+            report_name = ALL_REPORTS.get(kind, kind)
+            entry = CATALOG[report_name]
+            columns, rows, capabilities, args = self._table(report_id, report_name, query, options)
             if kind == "kernel_trace":
                 if "GrdX" not in columns:
                     raise NsightError(
                         "Unsupported trace schema: missing GrdX kernel discriminator."
                     )
                 rows = [row for row in rows if row["GrdX"] is not None]
-            name_column = (
-                "Operation" if "Operation" in columns else "Range" if "Range" in columns else "Name"
-            )
             if query.name_contains is not None:
                 rows = [
                     row
                     for row in rows
-                    if query.name_contains.casefold() in str(row[name_column]).casefold()
+                    if any(
+                        query.name_contains.casefold() in str(row[column] or "").casefold()
+                        for column in entry.name_columns
+                    )
                 ]
             defaults = {
                 "kernel_trace": "Duration (ns)",
                 "memory_size": "Total (B)",
                 "nvtx_trace": "Start (ns)",
             }
-            sort_by = query.sort_by or defaults.get(kind, "Total Time (ns)")
+            sort_by = query.sort_by or defaults.get(kind, entry.sort_by)
             if sort_by not in columns:
                 raise NsightError(f"Unknown sort column {sort_by!r}. Available columns: {columns}")
             present = [r for r in rows if r[sort_by] is not None]
@@ -440,7 +535,7 @@ class NsightService(AnalysisMixin):
                 ) from exc
             total = len(rows)
             page = rows[query.offset : query.offset + query.limit] if paginate else rows
-            if kind == "nvtx_trace":
+            if report_name == "nvtx_pushpop_trace":
                 for row in page:
                     start, end = row["Start (ns)"], row["End (ns)"]
                     row["time_query"] = (
@@ -459,6 +554,7 @@ class NsightService(AnalysisMixin):
                 },
                 "nsight_version": capabilities["version"],
                 "official_report": report_name,
+                "report_options": (options or ReportOptions()).model_dump(),
                 "filters": query.model_dump(exclude={"offset", "limit"} if not paginate else set()),
                 "sort_by": sort_by,
                 "columns": columns,
@@ -482,9 +578,11 @@ class NsightService(AnalysisMixin):
                         "NVTX trace supports Push/Pop only. Start/End ranges are available in summary only.",
                         "A returned time_query selects overlapping events across threads/devices, not launch attribution.",
                     ]
-                    if kind.startswith("nvtx_")
+                    if report_name
+                    in ("nvtx_sum", "nvtx_pushpop_sum", "nvtx_startend_sum", "nvtx_pushpop_trace")
                     else []
-                ),
+                )
+                + list(entry.semantics),
             }
 
     def memory_summary(

@@ -1,0 +1,135 @@
+{
+  "date": "2026-10-12",
+  "timezone": "Asia/Shanghai",
+  "environment": {
+    "configured_model": "gpt-6.1-sol",
+    "codex_version": "codex-cli 0.162.0-alpha.17.2",
+    "python": "3.13.5",
+    "mcp_sdk": "1.30.0",
+    "nsight_reader": "2025.6.3",
+    "runtime": "fresh installed wheel"
+  },
+  "results": [
+    {
+      "passed": true,
+      "errors": [],
+      "tool_calls": 13,
+      "tools": [
+        "nsight_capabilities",
+        "nsight_cuda_api_summary",
+        "nsight_kernel_summary",
+        "nsight_kernel_trace",
+        "nsight_memory_summary",
+        "nsight_nvtx_summary",
+        "nsight_nvtx_trace",
+        "nsight_open_report",
+        "nsight_stats"
+      ],
+      "reports": [
+        "cuda_api_sum",
+        "cuda_api_trace",
+        "cuda_gpu_kern_gb_sum",
+        "cuda_gpu_kern_sum",
+        "cuda_gpu_mem_size_sum",
+        "cuda_gpu_mem_time_sum",
+        "cuda_gpu_trace",
+        "nvtx_pushpop_trace",
+        "nvtx_sum"
+      ],
+      "case": "core",
+      "repetition": 1,
+      "exit_code": 0
+    },
+    {
+      "passed": true,
+      "errors": [],
+      "tool_calls": 13,
+      "tools": [
+        "nsight_capabilities",
+        "nsight_cuda_api_summary",
+        "nsight_kernel_summary",
+        "nsight_kernel_trace",
+        "nsight_memory_summary",
+        "nsight_nvtx_summary",
+        "nsight_nvtx_trace",
+        "nsight_open_report",
+        "nsight_stats"
+      ],
+      "reports": [
+        "cuda_api_sum",
+        "cuda_api_trace",
+        "cuda_gpu_kern_gb_sum",
+        "cuda_gpu_kern_sum",
+        "cuda_gpu_mem_size_sum",
+        "cuda_gpu_mem_time_sum",
+        "cuda_gpu_trace",
+        "nvtx_pushpop_trace",
+        "nvtx_sum"
+      ],
+      "case": "core",
+      "repetition": 2,
+      "exit_code": 0
+    },
+    {
+      "passed": true,
+      "errors": [],
+      "tool_calls": 8,
+      "tools": [
+        "nsight_capabilities",
+        "nsight_open_report",
+        "nsight_stats"
+      ],
+      "reports": [
+        "cuda_api_gpu_sum",
+        "cuda_kern_exec_sum",
+        "cuda_kern_exec_trace",
+        "nvtx_gpu_proj_sum",
+        "nvtx_gpu_proj_trace",
+        "nvtx_kern_sum"
+      ],
+      "case": "launch",
+      "repetition": 1,
+      "exit_code": 0
+    },
+    {
+      "passed": true,
+      "errors": [],
+      "tool_calls": 11,
+      "tools": [
+        "nsight_capabilities",
+        "nsight_compare",
+        "nsight_export_analysis",
+        "nsight_nvtx_summary",
+        "nsight_open_report"
+      ],
+      "reports": [
+        "nvtx_sum"
+      ],
+      "case": "compare",
+      "repetition": 1,
+      "exit_code": 0
+    },
+    {
+      "passed": true,
+      "errors": [],
+      "tool_calls": 5,
+      "tools": [
+        "nsight_capabilities",
+        "nsight_kernel_summary",
+        "nsight_open_report",
+        "nsight_stats"
+      ],
+      "reports": [
+        "cuda_gpu_kern_sum"
+      ],
+      "case": "diagnostics",
+      "repetition": 1,
+      "exit_code": 0
+    }
+  ],
+  "total_runs": 5,
+  "passed_runs": 5,
+  "actual_mcp_calls": 50,
+  "manual_answer_review": "Passed: key numbers, units, CPU/GPU distinction, overlap, queue nulls, projection limitations and missing data interpretation.",
+  "limitations": "Five fixed Chinese scenarios (core repeated twice), not a statistical guarantee for all prompts or models. Raw logs, paths and authentication remain local."
+}

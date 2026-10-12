@@ -1,4 +1,4 @@
-# Nsight Agent v0.2 中文入门指南
+# Nsight Agent v1.0 中文入门指南
 
 这份指南适用于在 Windows 上，通过 Codex 分析现成的 Nsight Systems 报告。完成后，你可以直接问：“列出最耗时的十个 CUDA kernel”，由 Codex 调用工具得到可复核的统计。
 
@@ -13,9 +13,9 @@
 
 分析已有报告不要求 Windows 本机有 NVIDIA GPU，也不要求安装 PyTorch。只有自行采集示例工作负载才需要 CUDA GPU 与 PyTorch。项目验证的是 Windows 阅读 Linux 报告；并不代表所有采集版本都兼容。
 
-## 2. 安装 v0.2
+## 2. 安装 v1.0
 
-解压发布的源代码包 `nsight_agent-0.2.0.tar.gz`，或 GitHub 的源代码 ZIP。进入包含 `pyproject.toml` 的目录，在资源管理器地址栏输入 `powershell` 打开终端。
+解压发布的源代码包 `nsight_agent-1.0.0.tar.gz`，或 GitHub 的源代码 ZIP。进入包含 `pyproject.toml` 的目录，在资源管理器地址栏输入 `powershell` 打开终端。
 
 执行：
 
@@ -25,7 +25,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m nsight_agent --doctor
 ```
 
-无需激活虚拟环境；这里始终明确使用项目的 `.venv` Python。
+无需激活虚拟环境；这里始终明确使用项目的 `.venv` Python。源码包用户也可以直接执行 `powershell -File .\install.ps1`，它会完成虚拟环境创建、安装、接入和样例连接检查。
 
 成功的检查结果应包含：
 
@@ -49,17 +49,17 @@ $env:NSIGHT_NSYS_PATH = 'C:\Program Files\NVIDIA Corporation\Nsight Systems 2025
 若只想安装 wheel，也可以在同一个虚拟环境执行：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install 'C:\你的下载目录\nsight_agent-0.2.0-py3-none-any.whl'
+.\.venv\Scripts\python.exe -m pip install 'C:\你的下载目录\nsight_agent-1.0.0-py3-none-any.whl'
 ```
 
-wheel 不包含公开报告和指南；第一次使用建议下载完整源代码包。
+wheel 不包含公开报告和指南，但包含分析 skill，可由 `--setup` 安装；第一次使用建议下载完整源代码包。
 
 ## 3. 接入 Codex
 
 在同一目录执行：
 
 ```powershell
-.\.venv\Scripts\python.exe -m nsight_agent --configure-codex
+.\.venv\Scripts\python.exe -m nsight_agent --setup
 ```
 
 该命令会：
@@ -67,11 +67,12 @@ wheel 不包含公开报告和指南；第一次使用建议下载完整源代�
 1. 确认当前 Python 与 Nsight 路径。
 2. 找到 `~/.codex/config.toml`（设置了 `CODEX_HOME` 时使用该目录）。
 3. 在同目录创建带时间戳的配置备份。
-4. 只更新 `nsight` 服务，启用本地 STDIO，并设置启动超时 30 秒、工具超时 300 秒、单个 Nsight 命令超时 120 秒。
+4. 先验证真实 STDIO 握手和工具调用，再更新 `nsight` 服务，设置 required、启动超时 30 秒、工具超时 600 秒、单个命令超时 120 秒。
+5. 安装 wheel 中打包的分析 skill；已有自定义版本会保留并提示。
 
-成功时输出 `"status": "configured"`。随后在 Codex 的 MCP 设置中重新连接/重启服务；如果当前聊天仍看不到新工具，重启桌面客户端并在新会话中验证。[官方 MCP 配置说明](https://developers.openai.com/codex/mcp)
+成功时输出 `"status": "ready"`；本机缺少部分报告时为 `ready_limited`，需查看缺失列表。required 设置意味着 Python/服务启动失败时 Codex 明确报错，不会默默忽略服务；修复路径或禁用/移除配置即可恢复。随后在 Codex 的 MCP 设置中重新连接/重启服务；如果当前聊天仍看不到新工具，重启桌面客户端并在新会话中验证。[官方 MCP 配置说明](https://developers.openai.com/codex/mcp)
 
-手动配置方式见 [README 配置片段](../README.md#install-and-connect)。不建议只执行 `codex mcp add` 而漏设工具超时；两种方式都应设置 `tool_timeout_sec = 300`。
+手动配置方式见 [README 配置片段](../README.md#install-and-connect)。不建议只执行 `codex mcp add` 而漏设工具超时；两种方式都应设置 `tool_timeout_sec = 600`。
 
 ## 4. 验证工具真正可用
 
@@ -81,13 +82,21 @@ wheel 不包含公开报告和指南；第一次使用建议下载完整源代�
 codex mcp get nsight
 ```
 
-应看到 `enabled: true`、正确的 `.venv\Scripts\python.exe` 路径以及 300 秒工具超时。这只能确认配置，不能代替真实连接检查。
+应看到 `enabled: true`、正确的 `.venv\Scripts\python.exe` 路径以及 600 秒工具超时。这只能确认配置，不能代替真实连接检查。
+
+还可执行真实连接检查：
+
+```powershell
+.\.venv\Scripts\python.exe -m nsight_agent --check-connection --report (Resolve-Path ".\examples\reports\baseline_nvtx.nsys-rep").Path
+```
+
+成功输出 `status=connected`，代表实际注册环境完成 SDK 握手与调用；仍需在 Codex 中验证模型流程。
 
 再在 Codex 中发送：
 
-> 使用 nsight_doctor 检查本机 Nsight，列出你当前能调用的十个 nsight 工具。
+> 使用 nsight_doctor 检查本机 Nsight，列出你当前能调用的十二个 nsight 工具。
 
-应看到这十个工具：`nsight_doctor`、`nsight_open_report`、`nsight_kernel_summary`、`nsight_kernel_trace`、`nsight_cuda_api_summary`、`nsight_memory_summary`、`nsight_nvtx_summary`、`nsight_nvtx_trace`、`nsight_compare`、`nsight_export_analysis`。若工具不存在，请参照第 8 节，而不是让模型用自行生成的 SQL 替代。
+应看到这十二个工具：`nsight_doctor`、`nsight_open_report`、`nsight_capabilities`、`nsight_stats`、`nsight_kernel_summary`、`nsight_kernel_trace`、`nsight_cuda_api_summary`、`nsight_memory_summary`、`nsight_nvtx_summary`、`nsight_nvtx_trace`、`nsight_compare`、`nsight_export_analysis`。若工具不存在，请参照第 8 节，而不是让模型用自行生成的 SQL 替代。
 
 ## 5. 跑通第一次分析
 
@@ -113,7 +122,7 @@ codex mcp get nsight
 
 该范围内第一名累计耗时仍为 1,266,481,454 ns，占比为 25.6%，原因是统计范围改变了分母。更多预期输出见 [完整演示](DEMO.md)。
 
-## 6. 十个工具怎么问
+## 6. 十二个工具怎么问
 
 | 工具 | 可直接复制的提问 |
 | --- | --- |
@@ -123,6 +132,12 @@ codex mcp get nsight
 | `nsight_kernel_trace` | “查看这个 kernel 的每次执行，按开始时间升序显示二十条。” |
 | `nsight_cuda_api_summary` | “列出名称包含 Synchronize 的 CUDA API，显示 CPU 侧调用耗时与次数。” |
 | `nsight_memory_summary` | “分别查询内存操作耗时和字节数；区分 memcpy 方向与 memset。” |
+| `nsight_capabilities` | “列出服务允许且本机支持的分析报告和默认排序。” |
+| `nsight_stats` | “查询 kernel 发射/排队明细，以及 Train 的 GPU 投影。” |
+| `nsight_nvtx_summary` | “发现报告中的 NVTX 范围和实例数。” |
+| `nsight_nvtx_trace` | “查看 Train 的单次 Push/Pop 范围，返回可查询窗口。” |
+| `nsight_compare` | “按两份报告各自的 Train 范围，对比 kernel/API/内存。” |
+| `nsight_export_analysis` | “把所选结果页面导出为 Markdown 和 JSON。” |
 
 限定区间的提问：
 
@@ -140,15 +155,18 @@ codex mcp get nsight
 {"report_id":"打开报告后返回的ID","query":{"start_ns":0,"end_ns":10000000000,"limit":10}}
 ```
 
-NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间区间与 NVTX 不能同时指定。报告 ID 仅在当前服务会话有效，重启后重新打开报告。v0.2 可用 `nsight_nvtx_summary` 发现范围，再用 `nsight_nvtx_trace` 查看 Push/Pop 实例；可直接使用返回的 `time_query`，不要把 `RangeId` 当作筛选序号。
+NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间区间与 NVTX 不能同时指定。报告 ID 仅在当前服务会话有效，重启后重新打开报告。v1.0 可用 `nsight_nvtx_summary` 发现范围，再用 `nsight_nvtx_trace` 查看 Push/Pop 实例；可直接使用返回的 `time_query`，不要把 `RangeId` 当作筛选序号。
 
-新增四个工具的提问：
+统一能力入口和分析工具的提问：
+
+- “发现服务实际支持的报告，查询第一名 kernel 的发射、排队与执行时间。”
+- “查看这个范围对应的 GPU 投影和 CUDA API 单次明细。”
 
 - “发现这份报告的 NVTX 范围，查看 Train 的单次范围明细。”
 - “打开优化后的报告，分别选择两份报告的 Train 范围，比较 kernel、API 和内存统计，说明次数是否变化。”
 - “把刚才的分析结果分别导出为 Markdown 和 JSON，标明这是哪些分页结果。”
 
-参数、真实样例和完整操作见 [v0.2 流程指南](WORKFLOW-v0.2.zh-CN.md)。
+参数、真实样例和完整操作见 [范围发现与对比指南](WORKFLOW-v0.2.zh-CN.md) 及 [18 个报告目录](REPORTS.md)。
 
 ## 7. 正确阅读数字
 
@@ -157,7 +175,7 @@ NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间
 - CPU 侧 CUDA API 时间与 GPU kernel 执行时间是不同指标。
 - 时间/NVTX 筛选包含与范围重叠的完整事件，耗时不会裁剪到边界。
 - “没有匹配数据”不证明实际 GPU 没有活动；报告可能未采集所需事件。
-- CUDA kernel 与 PyTorch 算子不是一一对应，v0.2 不承诺框架算子归因、GPU 利用率诊断或瓶颈根因判定。
+- CUDA kernel 与 PyTorch 算子不是一一对应，v1.0 不承诺框架算子归因、GPU 利用率诊断或瓶颈根因判定。
 
 ## 8. 常见故障
 
@@ -176,7 +194,7 @@ NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间
 | `Unknown or expired result_id` | 会话只保留最近 100 次分析；重新运行所需分析后导出 |
 | `Unknown report_id` | MCP 重启后重新打开报告；不要复用旧会话 ID |
 | `Unknown sort column` | 使用返回结果里的完整列名，例如 `Duration (ns)` 或 `Start (ns)` |
-| 超时 | 检查 300 秒工具超时是否生效；收窄查询范围。首次导出与复制仍需处理报告，可根据报告规模提高 `NSIGHT_TIMEOUT_SECONDS`，并将 Codex 超时设得更长 |
+| 超时 | 检查 600 秒工具超时是否生效；收窄查询范围。首次导出与复制仍需处理报告，可根据报告规模提高 `NSIGHT_TIMEOUT_SECONDS`，并将 Codex 超时设得更长 |
 | 磁盘空间不足 | 改用容量充足的 `NSIGHT_CACHE_DIR`；停止服务后清理旧会话缓存 |
 
 错误信息、Nsight 版本、工具名和去除敏感内容后的复现步骤可以用于提交问题；不需要上传自己的完整业务报告。
@@ -187,7 +205,7 @@ NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -e .
-.\.venv\Scripts\python.exe -m nsight_agent --configure-codex
+.\.venv\Scripts\python.exe -m nsight_agent --setup
 ```
 
 如果最初装的是 wheel，改为安装新 wheel 文件。随后重新连接服务，运行 doctor 并重新打开报告。移动项目目录后也需重新接入，否则 Codex 仍会启动旧路径。
@@ -199,7 +217,7 @@ codex mcp remove nsight
 .\.venv\Scripts\python.exe -m pip uninstall nsight-agent
 ```
 
-没有 CLI 时可在 Codex MCP 设置中移除 `nsight`。不要删除其他服务配置。指南的安装与接入不自动安装可选 skill；若自行复制了 `nsight-analysis`，可单独移除该 skill 文件夹。
+没有 CLI 时可在 Codex MCP 设置中移除 `nsight`。不要删除其他服务配置。`--setup` 会安装 `nsight-analysis` skill；卸载时可单独移除该 skill 文件夹，先保存自己的修改。较早的 `--configure-codex` 命令仅注册配置，仍保持兼容。
 
 doctor 的 `cache_dir` 显示实际缓存路径。默认在 Windows 本地应用数据目录的 `nsight-agent` 下；每个 `session-*` 文件夹是一次服务会话生成的副本和导出。**停止服务后**可以删除旧 `session-*` 目录，原始报告不在其中。配置备份位于 Codex 配置同目录，文件名为 `config.toml.before-nsight-*.bak`；恢复前先检查，避免覆盖后来新增的其他配置。
 
@@ -210,4 +228,5 @@ doctor 的 `cache_dir` 显示实际缓存路径。默认在 Windows 本地应用
 - [完整接口与参数](../README.md#tools)
 - [逐步演示及统计预期](DEMO.md)
 - [版本验证记录](VALIDATION.md)
+- [真实模型与安装验收](ACCEPTANCE.zh-CN.md)
 - [项目许可](../LICENSE)

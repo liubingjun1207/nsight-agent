@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nsight-agent"
-version = "0.2.0"
+version = "1.0.0"
 description = "Evidence-backed Nsight Systems tools for Codex over MCP"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,6 +24,9 @@ nsight-agent = "nsight_agent.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.data-files]
+"share/nsight-agent/skills/nsight-analysis" = ["skills/nsight-analysis/SKILL.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

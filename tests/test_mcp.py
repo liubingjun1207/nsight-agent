@@ -18,6 +18,8 @@ def test_stdio_contract():
                 assert {t.name for t in result.tools} == {
                     "nsight_doctor",
                     "nsight_open_report",
+                    "nsight_capabilities",
+                    "nsight_stats",
                     "nsight_kernel_summary",
                     "nsight_kernel_trace",
                     "nsight_cuda_api_summary",

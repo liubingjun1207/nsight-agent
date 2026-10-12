@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import importlib.metadata
 import json
 import os
 import re
@@ -15,7 +17,9 @@ from pathlib import Path
 from .core import NsightError, discover_nsys
 
 
-def render_config(original: str, python: str, nsys: str) -> str:
+def render_config(
+    original: str, python: str, nsys: str, *, required=False, tool_timeout=300
+) -> str:
     """Replace only the nsight table family, preserving unrelated TOML text and meaning."""
     before = tomllib.loads(original)
     sections = re.split(r"(?m)(?=^[ \t]*\[)", original)
@@ -29,7 +33,8 @@ def render_config(original: str, python: str, nsys: str) -> str:
         "\n[mcp_servers.nsight]\n"
         f"command = {json.dumps(python, ensure_ascii=False)}\n"
         'args = ["-m", "nsight_agent"]\n'
-        "enabled = true\nstartup_timeout_sec = 30\ntool_timeout_sec = 300\n"
+        "enabled = true\nstartup_timeout_sec = 30\n"
+        f"required = {'true' if required else 'false'}\ntool_timeout_sec = {tool_timeout}\n"
         "\n[mcp_servers.nsight.env]\n"
         f"NSIGHT_NSYS_PATH = {json.dumps(nsys, ensure_ascii=False)}\n"
         'NSIGHT_TIMEOUT_SECONDS = "120"\nPYTHONIOENCODING = "utf-8"\n'
@@ -52,13 +57,13 @@ def render_config(original: str, python: str, nsys: str) -> str:
     return result
 
 
-def configure_codex() -> dict:
+def configure_codex(*, required=False, tool_timeout=300) -> dict:
     nsys = str(discover_nsys().resolve())
     python = str(Path(sys.executable).resolve())
     home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
     path = home / "config.toml"
     original = path.read_text(encoding="utf-8") if path.exists() else ""
-    rendered = render_config(original, python, nsys)
+    rendered = render_config(original, python, nsys, required=required, tool_timeout=tool_timeout)
     home.mkdir(parents=True, exist_ok=True)
     backup = None
     if path.exists():
@@ -83,6 +88,59 @@ def configure_codex() -> dict:
         "python": python,
         "nsys": nsys,
         "startup_timeout_sec": 30,
-        "tool_timeout_sec": 300,
-        "next_step": "Restart/reconnect Codex MCP, then ask it to call nsight_doctor and list ten tools.",
+        "tool_timeout_sec": tool_timeout,
+        "required": required,
+        "next_step": "Restart/reconnect Codex MCP; call nsight_capabilities and verify twelve tools.",
+    }
+
+
+def install_analysis_skill() -> dict:
+    source = None
+    for item in importlib.metadata.distribution("nsight-agent").files or []:
+        if str(item).replace("\\", "/").endswith("skills/nsight-analysis/SKILL.md"):
+            candidate = Path(item.locate())
+            if candidate.is_file():
+                source = candidate
+                break
+    if source is None:
+        source = Path(__file__).resolve().parents[2] / "skills/nsight-analysis/SKILL.md"
+    if not source.is_file():
+        raise NsightError(
+            "Packaged analysis skill not found; reinstall the complete package.",
+            code="INSTALLATION_INCOMPLETE",
+        )
+    content = source.read_bytes()
+    home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+    directory = home / "skills/nsight-analysis"
+    target, marker = directory / "SKILL.md", directory / ".nsight-agent.sha256"
+    if target.exists():
+        current = hashlib.sha256(target.read_bytes()).hexdigest()
+        if current == hashlib.sha256(content).hexdigest():
+            return {"status": "unchanged", "path": str(target)}
+        if not marker.exists() or marker.read_text().strip() != current:
+            return {
+                "status": "preserved_custom",
+                "path": str(target),
+                "note": "Existing unrecognized or edited skill preserved; review it before upgrading manually.",
+            }
+    directory.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(content)
+    marker.write_text(hashlib.sha256(content).hexdigest() + "\n", encoding="utf-8")
+    return {"status": "installed", "path": str(target)}
+
+
+def setup() -> dict:
+    from .health import run_probe
+
+    nsys = str(discover_nsys().resolve())
+    checked = run_probe(env={"NSIGHT_NSYS_PATH": nsys, "PYTHONIOENCODING": "utf-8"})
+    if checked["status"] != "connected":
+        return checked
+    configured = configure_codex(required=True, tool_timeout=600)
+    return {
+        "status": "ready_limited" if checked.get("missing_reports") else "ready",
+        "connection": checked,
+        "configuration": configured,
+        "skill": install_analysis_skill(),
+        "next_step": "Reconnect/restart Codex, then try the documented analysis workflow.",
     }

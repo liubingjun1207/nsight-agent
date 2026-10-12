@@ -4,9 +4,11 @@
 
 第一次使用请先阅读 [中文入门指南](docs/GETTING_STARTED.zh-CN.md)：从零安装、验证连接、十个工具的提问示例、故障排查、更新和卸载。
 
+[最终范围](docs/PROJECT_SCOPE.zh-CN.md) 固定为 18 个 CUDA/NVTX 官方报告。[验收要求](docs/ACCEPTANCE.zh-CN.md) 分别检查数值正确性、真实模型流程和安装发布体验，通过后进入维护阶段。
+
 让 Codex 通过 MCP 调用 **Nsight Systems 官方统计命令**，分析 CUDA kernel 执行时间、CUDA API 和内存操作。模型选择分析步骤、解释结果，原始报告交给 Nsight 处理。
 
-v0.2：Windows 分析 Linux 采集的报告。暂不包含 GUI 自动操作、远程采集、Nsight Compute 或 PyTorch 算子归因。
+v1.0：Windows 分析 Linux 采集的报告。暂不包含 GUI 自动操作、远程采集、Nsight Compute 或 PyTorch 算子归因。
 
 ## 安装与接入 Codex
 
@@ -17,13 +19,13 @@ v0.2：Windows 分析 Linux 采集的报告。暂不包含 GUI 自动操作、�
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
-.\.venv\Scripts\python.exe -m nsight_agent --doctor
-.\.venv\Scripts\python.exe -m nsight_agent --configure-codex
+.\.venv\Scripts\python.exe -m nsight_agent --setup
+.\.venv\Scripts\python.exe -m nsight_agent --check-connection
 ```
 
-接入命令会备份 Codex 配置，只更新 `nsight` 服务，并设置 30 秒启动超时、300 秒工具超时。也可使用 [英文说明中的配置片段](README.md#install-and-connect) 手动配置。`NSIGHT_NSYS_PATH` 可覆盖自动发现，`NSIGHT_TIMEOUT_SECONDS` 默认 120 秒，`NSIGHT_CACHE_DIR` 可指定缓存目录。配置后重新连接 MCP 服务。
+源码包也可执行 `powershell -File .\install.ps1`，完成环境创建、安装、接入及样例检查。`--setup` 先完成真实 STDIO 验证，再备份配置、设置 required 服务和 30 秒启动/600 秒工具超时，并安装打包的分析 skill；自定义 skill 会保留。也可使用 [英文说明中的配置片段](README.md#install-and-connect) 手动配置。`NSIGHT_NSYS_PATH` 可覆盖自动发现，`NSIGHT_TIMEOUT_SECONDS` 默认 120 秒，`NSIGHT_CACHE_DIR` 可指定缓存目录。配置后重新连接 MCP 服务。
 
-可选：把 `skills/nsight-analysis` 复制到 `~/.codex/skills/`，供 Codex 自动选用分析指引。
+`--check-connection --report 报告路径` 可验证实际注册环境的工具与样例。required 服务启动失败时 Codex 会明确报错，需修复路径或禁用/移除服务；SDK 检查不等于模型流程验收。
 
 ## 使用
 
@@ -55,7 +57,11 @@ python -m venv .venv
 
 完整接口、错误处理及运行限制见 [英文说明](README.md)。
 
-## v0.2：发现范围、对比与导出
+## 统一能力入口与分析流程
+
+`nsight_capabilities` 列出服务允许的 18 个报告、可用状态、字段和排序；`nsight_stats` 提供统一调用入口。发射/排队、API 明细、GPU 投影等问题无需等待增加专用工具。[完整报告目录](docs/REPORTS.md) 列出实际接口。
+
+## 发现范围、对比与导出
 
 新增 `nsight_nvtx_summary` 和 `nsight_nvtx_trace`，先发现范围，再把明细里的 `time_query` 交给现有分析工具。明细支持 Push/Pop；Start/End 仅提供汇总。CPU 标记区间不代表 GPU 已完成，按时间查询也可能包含并发工作。
 
@@ -74,6 +80,8 @@ Nsight 完成统计，服务只整理返回结果。时间范围筛选包含与�
 原报告保持不变，服务在独立缓存中复制、导出并分析。停止服务后可以清理缓存中的 `session-*` 文件夹。分页限制模型收到的数据量；Nsight 本地仍需完成对应统计，大型 trace 建议先限定时间/NVTX。
 
 ## 示例与验证
+
+已登录 Codex CLI 后，可运行 `python examples/evaluate_codex.py --reports-dir examples/reports --output-dir .cache/model-evaluation`，检查真实自然语言问题的工具调用、范围、关键数值和导出文件。原始日志留在本地；另需检查最终回答的解释。完整要求见 [验收说明](docs/ACCEPTANCE.zh-CN.md)。
 
 - [公开样例来源与许可](examples/reports/README.md)
 - [自行采集 Linux 报告](examples/README.md)

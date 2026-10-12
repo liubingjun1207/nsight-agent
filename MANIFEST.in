@@ -1,5 +1,7 @@
 include LICENSE README.zh-CN.md CONTRIBUTING.md CHANGELOG.md
+include install.ps1
 recursive-include .github *.yml
-recursive-include docs *.md
+recursive-include docs *.md *.json
 recursive-include examples *.md *.py *.nsys-rep
 recursive-include skills *.md
+recursive-include tests *.json *.md

@@ -54,3 +54,38 @@ def test_configure_backs_up_and_preserves_config(tmp_path, monkeypatch):
     assert result["status"] == "configured"
     assert tomllib.loads(config.read_text(encoding="utf-8"))["model"] == "keep"
     assert (tmp_path / result["backup_path"]).read_text(encoding="utf-8") == original
+
+
+def test_complete_setup_config_requires_server_and_longer_timeout():
+    config = tomllib.loads(render_config("", "python", "nsys", required=True, tool_timeout=600))
+    server = config["mcp_servers"]["nsight"]
+    assert server["required"] is True and server["tool_timeout_sec"] == 600
+
+
+def test_setup_failure_keeps_existing_configuration(tmp_path, monkeypatch):
+    from nsight_agent.configure import setup
+
+    config = tmp_path / "config.toml"
+    config.write_text('model="keep"\n')
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    nsys = tmp_path / "nsys.exe"
+    nsys.touch()
+    monkeypatch.setattr("nsight_agent.configure.discover_nsys", lambda: nsys)
+    monkeypatch.setattr(
+        "nsight_agent.health.run_probe", lambda **kw: {"status": "error", "code": "TOOLS_MISSING"}
+    )
+    assert setup()["code"] == "TOOLS_MISSING"
+    assert config.read_text() == 'model="keep"\n'
+
+
+def test_install_skill_preserves_custom_edits(tmp_path, monkeypatch):
+    from nsight_agent.configure import install_analysis_skill
+
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    first = install_analysis_skill()
+    assert first["status"] == "installed"
+    assert install_analysis_skill()["status"] == "unchanged"
+    path = tmp_path / "skills/nsight-analysis/SKILL.md"
+    path.write_text("user-customized skill", encoding="utf-8")
+    assert install_analysis_skill()["status"] == "preserved_custom"
+    assert path.read_text() == "user-customized skill"

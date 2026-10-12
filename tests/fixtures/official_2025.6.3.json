@@ -1,0 +1,530 @@
+{
+  "cuda_api_sum": {
+    "columns": [
+      "Time (%)",
+      "Total Time (ns)",
+      "Num Calls",
+      "Avg (ns)",
+      "Med (ns)",
+      "Min (ns)",
+      "Max (ns)",
+      "StdDev (ns)",
+      "Name"
+    ],
+    "first": {
+      "Time (%)": "77.2",
+      "Total Time (ns)": "1203101863",
+      "Num Calls": "140917",
+      "Avg (ns)": "8537.7",
+      "Med (ns)": "7475.0",
+      "Min (ns)": "4189",
+      "Max (ns)": "215766",
+      "StdDev (ns)": "4002.5",
+      "Name": "cudaLaunchKernel"
+    }
+  },
+  "cuda_api_trace": {
+    "columns": [
+      "Start (ns)",
+      "Duration (ns)",
+      "Name",
+      "Result",
+      "CorrID",
+      "Pid",
+      "Tid",
+      "T-Pri",
+      "Thread Name"
+    ],
+    "first": {
+      "Start (ns)": "9770297",
+      "Duration (ns)": "21600",
+      "Name": "cudaDeviceSynchronize",
+      "Result": "0",
+      "CorrID": "141867",
+      "Pid": "353",
+      "Tid": "353",
+      "T-Pri": "20",
+      "Thread Name": "python3"
+    }
+  },
+  "cuda_api_gpu_sum": {
+    "columns": [
+      "Time (%)",
+      "Total Time (ns)",
+      "Instances",
+      "Avg (ns)",
+      "Med (ns)",
+      "Min (ns)",
+      "Max (ns)",
+      "StdDev (ns)",
+      "Category",
+      "Operation"
+    ],
+    "first": {
+      "Time (%)": "18.9",
+      "Total Time (ns)": "1266481454",
+      "Instances": "938",
+      "Avg (ns)": "1350193.4",
+      "Med (ns)": "1346098.5",
+      "Min (ns)": "780665",
+      "Max (ns)": "1551088",
+      "StdDev (ns)": "48780.5",
+      "Category": "CUDA_KERNEL",
+      "Operation": "void cudnn::cnn::wgrad_alg0_engine<float, (int)512, (int)6, (int)5, (int)3, (int)3, (int)3, (bool)0, (int)512>(int, int, int, const T1 *, int, T1 *, const T1 *, kernel_grad_params, unsigned long long, int, float, int, int, int, int)"
+    }
+  },
+  "cuda_gpu_kern_sum": {
+    "columns": [
+      "Time (%)",
+      "Total Time (ns)",
+      "Instances",
+      "Avg (ns)",
+      "Med (ns)",
+      "Min (ns)",
+      "Max (ns)",
+      "StdDev (ns)",
+      "Name"
+    ],
+    "first": {
+      "Time (%)": "24.9",
+      "Total Time (ns)": "1266481454",
+      "Instances": "938",
+      "Avg (ns)": "1350193.4",
+      "Med (ns)": "1346098.5",
+      "Min (ns)": "780665",
+      "Max (ns)": "1551088",
+      "StdDev (ns)": "48780.5",
+      "Name": "void cudnn::cnn::wgrad_alg0_engine<float, (int)512, (int)6, (int)5, (int)3, (int)3, (int)3, (bool)0, (int)512>(int, int, int, const T1 *, int, T1 *, const T1 *, kernel_grad_params, unsigned long long, int, float, int, int, int, int)"
+    }
+  },
+  "cuda_gpu_kern_gb_sum": {
+    "columns": [
+      "Time (%)",
+      "Total Time (ns)",
+      "Instances",
+      "Avg (ns)",
+      "Med (ns)",
+      "Min (ns)",
+      "Max (ns)",
+      "StdDev (ns)",
+      "GridXYZ",
+      "BlockXYZ",
+      "Name"
+    ],
+    "first": {
+      "Time (%)": "24.9",
+      "Total Time (ns)": "1265700789",
+      "Instances": "937",
+      "Avg (ns)": "1350801.3",
+      "Med (ns)": "1346099.0",
+      "Min (ns)": "1256595",
+      "Max (ns)": "1551088",
+      "StdDev (ns)": "45112.8",
+      "GridXYZ": "   5    2  128",
+      "BlockXYZ": "   8    8    1",
+      "Name": "void cudnn::cnn::wgrad_alg0_engine<float, (int)512, (int)6, (int)5, (int)3, (int)3, (int)3, (bool)0, (int)512>(int, int, int, const T1 *, int, T1 *, const T1 *, kernel_grad_params, unsigned long long, int, float, int, int, int, int)"
+    }
+  },
+  "cuda_gpu_sum": {
+    "columns": [
+      "Time (%)",
+      "Total Time (ns)",
+      "Instances",
+      "Avg (ns)",
+      "Med (ns)",
+      "Min (ns)",
+      "Max (ns)",
+      "StdDev (ns)",
+      "Category",
+      "Operation"
+    ],
+    "first": {
+      "Time (%)": "24.7",
+      "Total Time (ns)": "1266481454",
+      "Instances": "938",
+      "Avg (ns)": "1350193.4",
+      "Med (ns)": "1346098.5",
+      "Min (ns)": "780665",
+      "Max (ns)": "1551088",
+      "StdDev (ns)": "48780.5",
+      "Category": "CUDA_KERNEL",
+      "Operation": "void cudnn::cnn::wgrad_alg0_engine<float, (int)512, (int)6, (int)5, (int)3, (int)3, (int)3, (bool)0, (int)512>(int, int, int, const T1 *, int, T1 *, const T1 *, kernel_grad_params, unsigned long long, int, float, int, int, int, int)"
+    }
+  },
+  "cuda_gpu_trace": {
+    "columns": [
+      "Start (ns)",
+      "Duration (ns)",
+      "CorrId",
+      "GrdX",
+      "GrdY",
+      "GrdZ",
+      "BlkX",
+      "BlkY",
+      "BlkZ",
+      "Reg/Trd",
+      "StcSMem (B)",
+      "DymSMem (B)",
+      "Bytes (B)",
+      "Throughput (B/s)",
+      "SrcMemKd",
+      "DstMemKd",
+      "Device",
+      "Ctx",
+      "GreenCtx",
+      "Strm",
+      "Name"
+    ],
+    "first": {
+      "Start (ns)": "85462080",
+      "Duration (ns)": "34432",
+      "CorrId": "141878",
+      "GrdX": "",
+      "GrdY": "",
+      "GrdZ": "",
+      "BlkX": "",
+      "BlkY": "",
+      "BlkZ": "",
+      "Reg/Trd": "",
+      "StcSMem (B)": "",
+      "DymSMem (B)": "",
+      "Bytes (B)": "200704",
+      "Throughput (B/s)": "5828845568",
+      "SrcMemKd": "Pageable",
+      "DstMemKd": "Device",
+      "Device": "Tesla T4 (0)",
+      "Ctx": "1",
+      "GreenCtx": "",
+      "Strm": "7",
+      "Name": "[CUDA memcpy Host-to-Device]"
+    }
+  },
+  "cuda_gpu_mem_time_sum": {
+    "columns": [
+      "Time (%)",
+      "Total Time (ns)",
+      "Count",
+      "Avg (ns)",
+      "Med (ns)",
+      "Min (ns)",
+      "Max (ns)",
+      "StdDev (ns)",
+      "Operation"
+    ],
+    "first": {
+      "Time (%)": "86.3",
+      "Total Time (ns)": "39786716",
+      "Count": "1896",
+      "Avg (ns)": "20984.6",
+      "Med (ns)": "9808.0",
+      "Min (ns)": "1024",
+      "Max (ns)": "737400",
+      "StdDev (ns)": "52671.6",
+      "Operation": "[CUDA memcpy Host-to-Device]"
+    }
+  },
+  "cuda_gpu_mem_size_sum": {
+    "columns": [
+      "Total (B)",
+      "Count",
+      "Avg (B)",
+      "Med (B)",
+      "Min (B)",
+      "Max (B)",
+      "StdDev (B)",
+      "Operation"
+    ],
+    "first": {
+      "Total (B)": "220080000",
+      "Count": "1896",
+      "Avg (B)": "116075.9493670886",
+      "Med (B)": "54176.0",
+      "Min (B)": "256",
+      "Max (B)": "3136000",
+      "StdDev (B)": "241536.68646746807",
+      "Operation": "[CUDA memcpy Host-to-Device]"
+    }
+  },
+  "cuda_kern_exec_sum": {
+    "columns": [
+      "PID",
+      "TID",
+      "DevId",
+      "Count",
+      "QCount",
+      "TAvg (ns)",
+      "TMed (ns)",
+      "TMin (ns)",
+      "TMax (ns)",
+      "TStdDev (ns)",
+      "AAvg (ns)",
+      "AMed (ns)",
+      "AMin (ns)",
+      "AMax (ns)",
+      "AStdDev (ns)",
+      "QAvg (ns)",
+      "QMed (ns)",
+      "QMin (ns)",
+      "QMax (ns)",
+      "QStdDev (ns)",
+      "KAvg (ns)",
+      "KMed (ns)",
+      "KMin (ns)",
+      "KMax (ns)",
+      "KStdDev (ns)",
+      "API Name",
+      "Kernel Name"
+    ],
+    "first": {
+      "PID": "353",
+      "TID": "353",
+      "DevId": "0",
+      "Count": "10",
+      "QCount": "10",
+      "TAvg (ns)": "13362238.2",
+      "TMed (ns)": "13380345.0",
+      "TMin (ns)": "12861799",
+      "TMax (ns)": "13611091",
+      "TStdDev (ns)": "200394.0",
+      "AAvg (ns)": "13865.5",
+      "AMed (ns)": "11786.5",
+      "AMin (ns)": "6804",
+      "AMax (ns)": "30111",
+      "AStdDev (ns)": "6577.1",
+      "QAvg (ns)": "12289886.9",
+      "QMed (ns)": "12310261.0",
+      "QMin (ns)": "11771506",
+      "QMax (ns)": "12532079",
+      "QStdDev (ns)": "205352.8",
+      "KAvg (ns)": "1058485.8",
+      "KMed (ns)": "1058230.0",
+      "KMin (ns)": "1055382",
+      "KMax (ns)": "1061493",
+      "KStdDev (ns)": "1660.2",
+      "API Name": "cudaLaunchKernel",
+      "Kernel Name": "volta_sgemm_64x64_tn"
+    }
+  },
+  "cuda_kern_exec_trace": {
+    "columns": [
+      "API Start (ns)",
+      "API Dur (ns)",
+      "Queue Start (ns)",
+      "Queue Dur (ns)",
+      "Kernel Start (ns)",
+      "Kernel Dur (ns)",
+      "Total Dur (ns)",
+      "PID",
+      "TID",
+      "DevId",
+      "API Function",
+      "GridXYZ",
+      "BlockXYZ",
+      "Kernel Name"
+    ],
+    "first": {
+      "API Start (ns)": "85711215",
+      "API Dur (ns)": "44518",
+      "Queue Start (ns)": "",
+      "Queue Dur (ns)": "",
+      "Kernel Start (ns)": "85754941",
+      "Kernel Dur (ns)": "3680",
+      "Total Dur (ns)": "47406",
+      "PID": "353",
+      "TID": "353",
+      "DevId": "0",
+      "API Function": "cudaLaunchKernel",
+      "GridXYZ": "   2    1    1",
+      "BlockXYZ": "  64    1    1",
+      "Kernel Name": "void at::native::vectorized_elementwise_kernel<(int)4, at::native::FillFunctor<float>, at::detail::Array<char *, (int)1>>(int, T2, T3)"
+    }
+  },
+  "nvtx_sum": {
+    "columns": [
+      "Time (%)",
+      "Total Time (ns)",
+      "Instances",
+      "Avg (ns)",
+      "Med (ns)",
+      "Min (ns)",
+      "Max (ns)",
+      "StdDev (ns)",
+      "Style",
+      "Range"
+    ],
+    "first": {
+      "Time (%)": "21.2",
+      "Total Time (ns)": "15122574574",
+      "Instances": "1",
+      "Avg (ns)": "15122574574.0",
+      "Med (ns)": "15122574574.0",
+      "Min (ns)": "15122574574",
+      "Max (ns)": "15122574574",
+      "StdDev (ns)": "0.0",
+      "Style": "PushPop",
+      "Range": ":Epoch 2"
+    }
+  },
+  "nvtx_pushpop_sum": {
+    "columns": [
+      "Time (%)",
+      "Total Time (ns)",
+      "Instances",
+      "Avg (ns)",
+      "Med (ns)",
+      "Min (ns)",
+      "Max (ns)",
+      "StdDev (ns)",
+      "Range"
+    ],
+    "first": {
+      "Time (%)": "21.2",
+      "Total Time (ns)": "15122574574",
+      "Instances": "1",
+      "Avg (ns)": "15122574574.0",
+      "Med (ns)": "15122574574.0",
+      "Min (ns)": "15122574574",
+      "Max (ns)": "15122574574",
+      "StdDev (ns)": "0.0",
+      "Range": ":Epoch 2"
+    }
+  },
+  "nvtx_pushpop_trace": {
+    "columns": [
+      "Start (ns)",
+      "End (ns)",
+      "Duration (ns)",
+      "DurChild (ns)",
+      "DurNonChild (ns)",
+      "Name",
+      "PID",
+      "TID",
+      "Lvl",
+      "NumChild",
+      "RangeId",
+      "ParentId",
+      "RangeStack",
+      "NameTree"
+    ],
+    "first": {
+      "Start (ns)": "9628146",
+      "End (ns)": "15132202720",
+      "Duration (ns)": "15122574574",
+      "DurChild (ns)": "15122474965",
+      "DurNonChild (ns)": "99609",
+      "Name": ":Epoch 2",
+      "PID": "353",
+      "TID": "353",
+      "Lvl": "0",
+      "NumChild": "2",
+      "RangeId": "1",
+      "ParentId": "",
+      "RangeStack": ":1",
+      "NameTree": ":Epoch 2"
+    }
+  },
+  "nvtx_startend_sum": {
+    "columns": null,
+    "first": null
+  },
+  "nvtx_gpu_proj_sum": {
+    "columns": [
+      "Range",
+      "Style",
+      "Total Proj Time (ns)",
+      "Total Range Time (ns)",
+      "Range Instances",
+      "Proj Avg (ns)",
+      "Proj Med (ns)",
+      "Proj Min (ns)",
+      "Proj Max (ns)",
+      "Proj StdDev (ns)",
+      "Total GPU Ops",
+      "Avg GPU Ops",
+      "Avg Range Lvl",
+      "Avg Num Child"
+    ],
+    "first": {
+      "Range": ":Epoch 2",
+      "Style": "PushPop",
+      "Total Proj Time (ns)": "14970980009",
+      "Total Range Time (ns)": "15122574574",
+      "Range Instances": "1",
+      "Proj Avg (ns)": "14970980009.0",
+      "Proj Med (ns)": "14970980009.0",
+      "Proj Min (ns)": "14970980009",
+      "Proj Max (ns)": "14970980009",
+      "Proj StdDev (ns)": "0.0",
+      "Total GPU Ops": "113775",
+      "Avg GPU Ops": "113775.0",
+      "Avg Range Lvl": "0.0",
+      "Avg Num Child": "2.0"
+    }
+  },
+  "nvtx_gpu_proj_trace": {
+    "columns": [
+      "Name",
+      "Projected Start (ns)",
+      "Projected Duration (ns)",
+      "Orig Start (ns)",
+      "Orig Duration (ns)",
+      "Style",
+      "PID",
+      "TID",
+      "NumGPUOps",
+      "Lvl",
+      "NumChild",
+      "RangeId",
+      "ParentId",
+      "RangeStack"
+    ],
+    "first": {
+      "Name": ":Epoch 2",
+      "Projected Start (ns)": "85462080",
+      "Projected Duration (ns)": "14970980009",
+      "Orig Start (ns)": "9628146",
+      "Orig Duration (ns)": "15122574574",
+      "Style": "PushPop",
+      "PID": "353",
+      "TID": "353",
+      "NumGPUOps": "113775",
+      "Lvl": "0",
+      "NumChild": "2",
+      "RangeId": "1",
+      "ParentId": "",
+      "RangeStack": ":1"
+    }
+  },
+  "nvtx_kern_sum": {
+    "columns": [
+      "NVTX Range",
+      "Style",
+      "PID",
+      "TID",
+      "NVTX Inst",
+      "Kern Inst",
+      "Total Time (ns)",
+      "Avg (ns)",
+      "Med (ns)",
+      "Min (ns)",
+      "Max (ns)",
+      "StdDev (ns)",
+      "Kernel Name"
+    ],
+    "first": {
+      "NVTX Range": "",
+      "Style": "",
+      "PID": "353",
+      "TID": "374",
+      "NVTX Inst": "0",
+      "Kern Inst": "1876",
+      "Total Time (ns)": "98565654",
+      "Avg (ns)": "52540.3",
+      "Med (ns)": "51072.0",
+      "Min (ns)": "26304",
+      "Max (ns)": "63679",
+      "StdDev (ns)": "6148.6",
+      "Kernel Name": "void at::native::reduce_kernel<(int)512, (int)1, at::native::ReduceOp<float, at::native::func_wrapper_t<float, at::native::sum_functor<float, float, float>::operator ()(at::TensorIterator &)::[lambda(float, float) (instance 1)]>, unsigned int, float, (int)4>>(T3)"
+    }
+  }
+}

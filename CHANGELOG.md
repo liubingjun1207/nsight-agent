@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0 — 2026-10-12
+
+- Close the fixed 18-report CUDA/NVTX scope through capability discovery and an allowlisted unified statistics tool; retain all v0.2 APIs.
+- Add report-specific schemas, name/format parameters, launch and GPU-projection semantics, plus diagnostic error codes and recovery guidance.
+- Package the analysis skill in wheels; add validated setup, actual configured-server checks and a Windows source-package installer.
+- Add opt-in real Codex evaluations recording actual tool calls, numeric/range checks, exports and diagnostic behavior.
+- Test source and installed wheels in CI; document separate numeric, model-flow and installation acceptance gates.
+- Enter maintenance after the published acceptance record passes; new domains require an explicit scope revision.
+
 ## 0.2.0 — 2026-10-12
 
 - Discover NVTX aggregate ranges and individual Push/Pop windows through official Nsight reports.

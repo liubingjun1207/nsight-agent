@@ -18,7 +18,8 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from nsight_agent.analysis import CompareQuery, Scope
-from nsight_agent.core import NsightService, NvtxTraceQuery, Query
+from nsight_agent.catalog import CATALOG, ReportOptions
+from nsight_agent.core import NsightError, NsightService, NvtxTraceQuery, Query, StatsQuery
 
 pytestmark = [
     pytest.mark.integration,
@@ -218,3 +219,75 @@ def test_real_two_report_comparison(capture, candidate, tmp_path, kind):
                     assert change["relative_percent"] is None
     exported = service.export_analysis([result["result_id"]], "json")
     assert json.loads(Path(exported["path"]).read_text(encoding="utf-8"))["results"][0] == result
+
+
+@pytest.mark.parametrize("name", list(CATALOG))
+def test_complete_catalog_against_official_cli(capture, tmp_path, name):
+    service, report_id = capture
+    if name == "nvtx_startend_sum":
+        # This specific public capture has no Start/End NVTX events.
+        with pytest.raises(NsightError) as error:
+            service.stats(report_id, name)
+        assert error.value.code == "MISSING_DATA"
+        return
+    result = service.stats(report_id, name, StatsQuery(limit=2))
+    raw = direct_rows(result, tmp_path)
+    sort = result["sort_by"]
+    present = [r for r in raw if r[sort]]
+    missing = [r for r in raw if not r[sort]]
+    raw = (
+        sorted(present, key=lambda r: float(r[sort]), reverse=result["filters"]["descending"])
+        + missing
+    )
+    assert len(raw) == result["total_rows"]
+    for actual, expected in zip(result["rows"], raw[:2], strict=True):
+        for column in result["columns"]:
+            value = actual[column]
+            assert value == (
+                float(expected[column])
+                if isinstance(value, (int, float))
+                else expected[column] or None
+            )
+
+
+@pytest.mark.parametrize(
+    "name,options",
+    [
+        ("cuda_gpu_kern_sum", ReportOptions(name_format="base", annotate_nvtx=True)),
+        ("cuda_kern_exec_trace", ReportOptions(name_format="mangled")),
+        ("nvtx_kern_sum", ReportOptions(name_format="base")),
+    ],
+)
+def test_actual_report_parameters(capture, tmp_path, name, options):
+    service, report_id = capture
+    result = service.stats(report_id, name, StatsQuery(nvtx="Train", limit=2), options)
+    raw = direct_rows(result, tmp_path)
+    assert result["total_rows"] == len(raw) > 0
+
+
+def test_installer_checks_actual_connection(tmp_path, monkeypatch):
+    from nsight_agent.configure import setup
+    from nsight_agent.health import check_connection
+
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    result = setup()
+    assert result["status"] == "ready"
+    assert len(result["connection"]["tools"]) == 12
+    assert len(result["connection"]["available_reports"]) == 18
+    assert result["skill"]["status"] in ("installed", "unchanged")
+    checked = check_connection(report=str(SAMPLE))
+    assert checked["status"] == "connected"
+    assert checked["sample"]["rows"][0]["Total Time (ns)"] == 1266481454
+
+
+@pytest.mark.skipif(
+    not os.environ.get("NSIGHT_STARTEND_REPORT"),
+    reason="Optional locally generated Windows Start/End capture",
+)
+def test_real_startend_capture(tmp_path):
+    service = NsightService(cache_dir=tmp_path)
+    report_id = service.open_report(os.environ["NSIGHT_STARTEND_REPORT"])["report_id"]
+    result = service.stats(report_id, "nvtx_startend_sum")
+    raw = direct_rows(result, tmp_path)
+    assert result["rows"][0]["Instances"] == int(raw[0]["Instances"]) == 3
+    assert result["rows"][0]["Range"] == ":AsyncStep"

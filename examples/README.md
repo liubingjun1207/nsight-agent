@@ -27,3 +27,14 @@ nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none \
 ```
 
 Keep the machine, inputs, software versions and power settings consistent. Check both checksums, compare `Train` or corresponding `step` windows, and inspect count changes. These instructions require your Linux GPU environment. The bundled NVIDIA pair is available when you cannot collect locally.
+
+## Optional Start/End validation
+
+`startend_workload.py` records three same-thread `AsyncStep` Start/End ranges plus nested Push/Pop ranges, with seeded CUDA matrices and no external dataset. Capture it with:
+
+```bash
+nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none \
+  --output=startend-validation python startend_workload.py
+```
+
+For the optional test, set `NSIGHT_STARTEND_REPORT` to the captured report's absolute path alongside `NSIGHT_INTEGRATION=1`. The test expects three `AsyncStep` instances. Our local positive validation was collected on Windows; it is not presented as a Linux capture. The public NVIDIA Linux baseline exercises the missing-data path for Start/End instead.
