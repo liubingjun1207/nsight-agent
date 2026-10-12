@@ -14,3 +14,16 @@ Copy `sample-linux.nsys-rep` to Windows and give its absolute path to `nsight_op
 Try `query={"nvtx":"step/0"}` and compare with the whole-report kernel summary. The whole report includes initialization/warmup. `cpu_wait` is an intentional CPU delay; this example does not claim to diagnose real application stalls.
 
 For a sample requiring no collection setup, use the bundled [official NVIDIA report](reports/README.md). The synthetic CSV strings in tests are test fixtures, not measured performance.
+
+## Capture a baseline/candidate pair
+
+`compare_workload.py` uses identical seeded inputs, five steps, and five matrix/ReLU operations per step. Baseline synchronizes every operation and allocates a ReLU result; candidate uses in-place ReLU and synchronizes at each step end. Both print a checksum for a numerical sanity check. Speedup is not guaranteed.
+
+```bash
+nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none \
+  --output=baseline-linux python compare_workload.py --variant baseline
+nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none \
+  --output=candidate-linux python compare_workload.py --variant candidate
+```
+
+Keep the machine, inputs, software versions and power settings consistent. Check both checksums, compare `Train` or corresponding `step` windows, and inspect count changes. These instructions require your Linux GPU environment. The bundled NVIDIA pair is available when you cannot collect locally.

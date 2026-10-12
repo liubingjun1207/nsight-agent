@@ -18,3 +18,14 @@ Get-FileHash 'examples/reports/baseline_nvtx.nsys-rep' -Algorithm SHA256
 ```
 
 The included sample is public training data. Do not substitute private workload reports into a public release. Project-created local captures under `.cache/` are excluded from version control.
+
+## v0.2 comparison capture
+
+`firstOptimization.nsys-rep` is another unmodified capture from the same NVIDIA training directory and pinned commit, covered by the same retained license.
+
+- [Original artifact](https://github.com/NVIDIA/nsight-training/blob/b17c40eef23929d08ec42e66667b29ae336ea8ac/cuda/2021_gtc/x-ac-03-v1/task1/task/nsys/precollected_reports/firstOptimization.nsys-rep)
+- Size: 21,571,601 bytes
+- SHA-256: `d81a008bdccd386cd1a382b49f87e90ff5bbd729bd036a9bbe11d24fa1c06980`
+- Nsight metadata: Linux / Tesla T4. This is NVIDIA's tutorial optimization capture, not a locally generated Linux report.
+
+Use the two reports to validate exact-name comparison, count comparisons and independently selected `Train` ranges. They do not establish that every kernel gets faster or that two runs have identical environments. The project does not claim a controlled benchmark from these artifacts.

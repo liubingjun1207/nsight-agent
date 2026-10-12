@@ -10,7 +10,7 @@ Ask Codex about CUDA kernel timing. This local MCP server calls **NVIDIA Nsight 
 Your question → Codex → MCP tools → nsys stats → structured results → Codex
 ```
 
-The first release targets Windows analysis of Linux captures. GUI automation, remote collection, Nsight Compute and framework-operator attribution are outside v0.1. No separate model API key is required by this server.
+This release targets Windows analysis of Linux captures. GUI automation, remote collection, Nsight Compute and framework-operator attribution are outside v0.2. No separate model API key is required by this server.
 
 ## Install and connect
 
@@ -57,6 +57,10 @@ For reusable analysis guidance, copy `skills/nsight-analysis` into `~/.codex/ski
 | `nsight_kernel_trace` | `cuda_gpu_trace`: kernel rows only, with start/duration/device/stream |
 | `nsight_cuda_api_summary` | `cuda_api_sum`: CPU-side CUDA calls |
 | `nsight_memory_summary` | `metric="time"`: `cuda_gpu_mem_time_sum`; `metric="size"`: `cuda_gpu_mem_size_sum` |
+| `nsight_nvtx_summary` | `nvtx_sum`: discover Push/Pop and Start/End range aggregates |
+| `nsight_nvtx_trace` | `nvtx_pushpop_trace`: individual Push/Pop ranges and reusable time windows |
+| `nsight_compare` | Compare full official kernel/API/memory tables before pagination |
+| `nsight_export_analysis` | Export immutable selected result pages as Markdown or JSON |
 
 Analyses accept `report_id` and an optional `query` object:
 
@@ -77,6 +81,14 @@ Query fields:
 
 Results preserve NVIDIA's column names and include units, version, official report, filters, full command arguments for reproduction, total matching rows and pagination. Memory time and size are separate queries, never ambiguously joined. Unknown versions/options, missing data, malformed CSV and subprocess errors surface as MCP tool errors.
 
+## v0.2 analysis workflow
+
+Discover NVTX names with `nsight_nvtx_summary`, then individual Push/Pop ranges with `nsight_nvtx_trace`. Its default order is chronological. A trace row includes `time_query` for existing analysis tools, PID/TID and nesting. Official names retain domain prefixes; `RangeId` is not an NVTX filter index. Start/End instance discovery is not supported. A CPU annotation window is not GPU completion or launch attribution.
+
+Open baseline and candidate reports, then use `nsight_compare` with independent scopes. It supports kernel summary, CUDA API summary, memory time and memory size; exact names are matched across complete tables. Differences are candidate minus baseline, missing sides are null, and count changes are flagged. Read [the full comparison and export reference](docs/WORKFLOW-v0.2.md) or [中文流程指南](docs/WORKFLOW-v0.2.zh-CN.md).
+
+Every analysis returns a `result_id`; `nsight_export_analysis` writes selected snapshots to `<cache_dir>/exports/`. The last 100 results are retained per service session; exports persist on disk. They contain local paths and reproduction commands. Only requested pages are exported, with pagination metadata.
+
 ## Try the public sample
 
 The repository includes NVIDIA's Linux/Tesla T4 training capture at `examples/reports/baseline_nvtx.nsys-rep`. See [provenance and license](examples/reports/README.md). The binary is excluded from the Python wheel; use the source checkout for examples.
@@ -89,12 +101,12 @@ See [the reproducible demo](docs/DEMO.md) and [Linux collection instructions](ex
 
 ## Statistical and operational boundaries
 
-- Nsight computes the statistics. Python only parses, filters names/kernel rows, sorts and paginates them.
+- Nsight computes the statistics. Python parses, filters, sorts and paginates them; comparisons subtract official aggregates without recomputing their statistics.
 - Time/NVTX filters include overlapping events with full durations, not clipped durations. `Time (%)` retains the official denominator before name filtering or pagination.
 - Cumulative kernel time is not application wall time or GPU utilization; concurrent kernels may overlap. CPU API duration is not GPU execution time.
-- No rows or missing capture data cannot establish zero activity or a root cause. Framework operators need additional attribution that v0.1 does not provide.
+- No rows or missing capture data cannot establish zero activity or a root cause. Framework operators need additional attribution that this release does not provide.
 - The original report is copied into an isolated cache. `.nsys-rep` is exported with `nsys export`; all `nsys stats` commands operate on the cached SQLite. Registration is lazy, so a corrupt report fails at first analysis rather than registration.
-- Local profiling data stays on disk; selected result rows are returned to the connected model. No HTTP listener or telemetry is started by this service.
+- Local profiling data stays on disk; selected result rows are returned to the connected model. No HTTP listener or telemetry is started by this service. Export files contain the selected evidence and local paths.
 - Commands use fixed reports, argument arrays, a private working directory and a timeout. The service does not expose shell commands, SQL, or arbitrary report scripts. It removes report-path/Python-path overrides from the child environment.
 - Pagination bounds model output, not Nsight's work: each query materializes the selected official CSV locally before sorting. Narrow large traces by time/NVTX. Cache copies require additional disk space. Queries are serialized per server.
 

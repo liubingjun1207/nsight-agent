@@ -19,6 +19,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .analysis import AnalysisMixin
+
 REPORTS = {
     "kernel_summary": "cuda_gpu_kern_sum",
     "kernel_trace": "cuda_gpu_trace",
@@ -26,6 +28,8 @@ REPORTS = {
     "memory_time": "cuda_gpu_mem_time_sum",
     "memory_size": "cuda_gpu_mem_size_sum",
 }
+OPTIONAL_REPORTS = {"nvtx_summary": "nvtx_sum", "nvtx_trace": "nvtx_pushpop_trace"}
+ALL_REPORTS = REPORTS | OPTIONAL_REPORTS
 
 
 class NsightError(RuntimeError):
@@ -64,6 +68,12 @@ class Report:
     mtime_ns: int
 
 
+class NvtxTraceQuery(Query):
+    """NVTX discovery defaults to chronological order."""
+
+    descending: bool = False
+
+
 def discover_nsys(explicit: str | None = None) -> Path:
     configured = explicit or os.environ.get("NSIGHT_NSYS_PATH")
     if configured:
@@ -83,16 +93,29 @@ def discover_nsys(explicit: str | None = None) -> Path:
     raise NsightError("Nsight Systems CLI not found. Set NSIGHT_NSYS_PATH to nsys.exe.")
 
 
-def parse_csv(text: str) -> tuple[list[str], list[dict]]:
+def parse_csv(text: str, required: set[str] | None = None) -> tuple[list[str], list[dict]]:
     """Keep NVIDIA's column labels/units; preserve integer timestamp precision."""
     reader = csv.DictReader(io.StringIO(text.lstrip("\ufeff")))
     columns = reader.fieldnames or []
-    if not columns or not any(c in columns for c in ("Name", "Operation", "Kernel Name")):
+    if not columns or not any(c in columns for c in ("Name", "Operation", "Kernel Name", "Range")):
         raise NsightError("Nsight returned no valid CSV table; report data may be missing.")
+    if required and not required.issubset(columns):
+        raise NsightError(f"Unsupported report schema: missing {sorted(required - set(columns))}.")
     if len(set(columns)) != len(columns):
         raise NsightError("Nsight returned duplicate CSV columns.")
     rows = []
-    text_columns = {"Name", "Operation", "Kernel Name", "Device", "SrcMemKd", "DstMemKd"}
+    text_columns = {
+        "Name",
+        "Operation",
+        "Kernel Name",
+        "Device",
+        "SrcMemKd",
+        "DstMemKd",
+        "Range",
+        "Style",
+        "NameTree",
+        "RangeStack",
+    }
     for record in reader:
         if None in record or any(value is None for value in record.values()):
             raise NsightError("Malformed Nsight CSV row.")
@@ -177,7 +200,7 @@ def run_process(args: list[str], *, cwd: Path, env: dict, timeout: float):
     return subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
 
 
-class NsightService:
+class NsightService(AnalysisMixin):
     def __init__(
         self, nsys: str | None = None, cache_dir: str | Path | None = None, timeout: float = 120
     ):
@@ -189,6 +212,7 @@ class NsightService:
         self._capabilities: dict | None = None
         self._lock = threading.RLock()
         self._session_cache: Path | None = None
+        self._results: dict[str, dict] = {}
 
     def _run(self, args: list[str], cwd: Path) -> str:
         env = os.environ.copy()
@@ -242,6 +266,9 @@ class NsightService:
                 "reports": available,
                 "options": options,
                 "missing_reports": sorted(set(REPORTS.values()) - set(available)),
+                "optional_reports": {
+                    kind: name in available for kind, name in OPTIONAL_REPORTS.items()
+                },
                 "cache_dir": str(self.cache.resolve()),
             }
             return dict(self._capabilities)
@@ -341,15 +368,44 @@ class NsightService:
         # An empty working directory prevents shadowing NVIDIA's built-in reports.
         with tempfile.TemporaryDirectory(prefix="run-", dir=self.cache) as directory:
             stdout = self._run(args, Path(directory))
-        columns, rows = parse_csv(stdout)
+        if report_name == "nvtx_sum":
+            required_columns = {"Range", "Style", "Total Time (ns)", "Instances"}
+        elif report_name == "nvtx_pushpop_trace":
+            required_columns = {
+                "Name",
+                "Start (ns)",
+                "End (ns)",
+                "Duration (ns)",
+                "PID",
+                "TID",
+                "RangeId",
+                "ParentId",
+                "Lvl",
+            }
+        elif report_name == "cuda_gpu_trace":
+            required_columns = {"Name", "Start (ns)", "Duration (ns)", "GrdX"}
+        elif report_name == "cuda_gpu_mem_size_sum":
+            required_columns = {"Operation", "Total (B)"}
+        else:
+            required_columns = {
+                "Operation" if report_name == "cuda_gpu_mem_time_sum" else "Name",
+                "Total Time (ns)",
+            }
+        columns, rows = parse_csv(stdout, required_columns)
         return columns, rows, capabilities, args
 
     def query(self, report_id: str, kind: str, query: Query | None = None) -> dict:
-        if kind not in REPORTS:
-            raise NsightError("Unsupported analysis kind.")
-        query = query or Query()
         with self._lock:
-            report_name = REPORTS[kind]
+            return self._remember(self._query_result(report_id, kind, query))
+
+    def _query_result(
+        self, report_id: str, kind: str, query: Query | None = None, *, paginate: bool = True
+    ) -> dict:
+        if kind not in ALL_REPORTS:
+            raise NsightError("Unsupported analysis kind.")
+        query = query or (NvtxTraceQuery() if kind == "nvtx_trace" else Query())
+        with self._lock:
+            report_name = ALL_REPORTS[kind]
             columns, rows, capabilities, args = self._table(report_id, report_name, query)
             if kind == "kernel_trace":
                 if "GrdX" not in columns:
@@ -357,14 +413,20 @@ class NsightService:
                         "Unsupported trace schema: missing GrdX kernel discriminator."
                     )
                 rows = [row for row in rows if row["GrdX"] is not None]
-            name_column = "Operation" if "Operation" in columns else "Name"
+            name_column = (
+                "Operation" if "Operation" in columns else "Range" if "Range" in columns else "Name"
+            )
             if query.name_contains is not None:
                 rows = [
                     row
                     for row in rows
                     if query.name_contains.casefold() in str(row[name_column]).casefold()
                 ]
-            defaults = {"kernel_trace": "Duration (ns)", "memory_size": "Total (B)"}
+            defaults = {
+                "kernel_trace": "Duration (ns)",
+                "memory_size": "Total (B)",
+                "nvtx_trace": "Start (ns)",
+            }
             sort_by = query.sort_by or defaults.get(kind, "Total Time (ns)")
             if sort_by not in columns:
                 raise NsightError(f"Unknown sort column {sort_by!r}. Available columns: {columns}")
@@ -377,19 +439,33 @@ class NsightService:
                     f"Nsight returned incompatible types for sort column {sort_by}."
                 ) from exc
             total = len(rows)
-            page = rows[query.offset : query.offset + query.limit]
-            next_offset = query.offset + len(page)
+            page = rows[query.offset : query.offset + query.limit] if paginate else rows
+            if kind == "nvtx_trace":
+                for row in page:
+                    start, end = row["Start (ns)"], row["End (ns)"]
+                    row["time_query"] = (
+                        {"start_ns": start, "end_ns": end}
+                        if isinstance(start, int) and isinstance(end, int) and start <= end
+                        else None
+                    )
+            next_offset = query.offset + len(page) if paginate else total
+            source = self.reports[report_id]
             return {
                 "report_id": report_id,
+                "source": {
+                    "path": str(source.path),
+                    "size_bytes": source.size,
+                    "mtime_ns": source.mtime_ns,
+                },
                 "nsight_version": capabilities["version"],
                 "official_report": report_name,
-                "filters": query.model_dump(),
+                "filters": query.model_dump(exclude={"offset", "limit"} if not paginate else set()),
                 "sort_by": sort_by,
                 "columns": columns,
                 "units": {"time": "ns", "memory": "B", "throughput": "B/s", "ratio": "%"},
                 "rows": page,
                 "total_rows": total,
-                "offset": query.offset,
+                "offset": query.offset if paginate else 0,
                 "next_offset": next_offset if next_offset < total else None,
                 "provenance": {"executable": capabilities["nsys_path"], "arguments": args},
                 "semantics": [
@@ -398,7 +474,17 @@ class NsightService:
                     "Kernel cumulative time is neither application wall time nor GPU utilization.",
                     "CUDA API durations measure CPU calls, not GPU kernel execution.",
                     "No matching rows does not prove zero activity outside the recorded data.",
-                ],
+                ]
+                + (
+                    [
+                        "NVTX durations measure CPU annotation ranges, not GPU completion or utilization.",
+                        "Official domain-prefixed names are preserved; do not treat RangeId as an NVTX filter instance index.",
+                        "NVTX trace supports Push/Pop only. Start/End ranges are available in summary only.",
+                        "A returned time_query selects overlapping events across threads/devices, not launch attribution.",
+                    ]
+                    if kind.startswith("nvtx_")
+                    else []
+                ),
             }
 
     def memory_summary(

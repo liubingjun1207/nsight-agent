@@ -22,6 +22,10 @@ def test_stdio_contract():
                     "nsight_kernel_trace",
                     "nsight_cuda_api_summary",
                     "nsight_memory_summary",
+                    "nsight_nvtx_summary",
+                    "nsight_nvtx_trace",
+                    "nsight_compare",
+                    "nsight_export_analysis",
                 }
                 error = await session.call_tool(
                     "nsight_open_report", {"path": "does-not-exist.nsys-rep"}

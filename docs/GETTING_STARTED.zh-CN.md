@@ -1,4 +1,4 @@
-# Nsight Agent v0.1 中文入门指南
+# Nsight Agent v0.2 中文入门指南
 
 这份指南适用于在 Windows 上，通过 Codex 分析现成的 Nsight Systems 报告。完成后，你可以直接问：“列出最耗时的十个 CUDA kernel”，由 Codex 调用工具得到可复核的统计。
 
@@ -13,9 +13,9 @@
 
 分析已有报告不要求 Windows 本机有 NVIDIA GPU，也不要求安装 PyTorch。只有自行采集示例工作负载才需要 CUDA GPU 与 PyTorch。项目验证的是 Windows 阅读 Linux 报告；并不代表所有采集版本都兼容。
 
-## 2. 安装 v0.1
+## 2. 安装 v0.2
 
-解压发布的源代码包 `nsight_agent-0.1.0.tar.gz`，或 GitHub 的源代码 ZIP。进入包含 `pyproject.toml` 的目录，在资源管理器地址栏输入 `powershell` 打开终端。
+解压发布的源代码包 `nsight_agent-0.2.0.tar.gz`，或 GitHub 的源代码 ZIP。进入包含 `pyproject.toml` 的目录，在资源管理器地址栏输入 `powershell` 打开终端。
 
 执行：
 
@@ -49,7 +49,7 @@ $env:NSIGHT_NSYS_PATH = 'C:\Program Files\NVIDIA Corporation\Nsight Systems 2025
 若只想安装 wheel，也可以在同一个虚拟环境执行：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install 'C:\你的下载目录\nsight_agent-0.1.0-py3-none-any.whl'
+.\.venv\Scripts\python.exe -m pip install 'C:\你的下载目录\nsight_agent-0.2.0-py3-none-any.whl'
 ```
 
 wheel 不包含公开报告和指南；第一次使用建议下载完整源代码包。
@@ -85,9 +85,9 @@ codex mcp get nsight
 
 再在 Codex 中发送：
 
-> 使用 nsight_doctor 检查本机 Nsight，列出你当前能调用的六个 nsight 工具。
+> 使用 nsight_doctor 检查本机 Nsight，列出你当前能调用的十个 nsight 工具。
 
-应看到这六个工具：`nsight_doctor`、`nsight_open_report`、`nsight_kernel_summary`、`nsight_kernel_trace`、`nsight_cuda_api_summary`、`nsight_memory_summary`。若工具不存在，请参照第 8 节，而不是让模型用自行生成的 SQL 替代。
+应看到这十个工具：`nsight_doctor`、`nsight_open_report`、`nsight_kernel_summary`、`nsight_kernel_trace`、`nsight_cuda_api_summary`、`nsight_memory_summary`、`nsight_nvtx_summary`、`nsight_nvtx_trace`、`nsight_compare`、`nsight_export_analysis`。若工具不存在，请参照第 8 节，而不是让模型用自行生成的 SQL 替代。
 
 ## 5. 跑通第一次分析
 
@@ -113,7 +113,7 @@ codex mcp get nsight
 
 该范围内第一名累计耗时仍为 1,266,481,454 ns，占比为 25.6%，原因是统计范围改变了分母。更多预期输出见 [完整演示](DEMO.md)。
 
-## 6. 六个工具怎么问
+## 6. 十个工具怎么问
 
 | 工具 | 可直接复制的提问 |
 | --- | --- |
@@ -140,7 +140,15 @@ codex mcp get nsight
 {"report_id":"打开报告后返回的ID","query":{"start_ns":0,"end_ns":10000000000,"limit":10}}
 ```
 
-NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间区间与 NVTX 不能同时指定。报告 ID 仅在当前服务会话有效，重启后重新打开报告。v0.1 不提供 NVTX 范围自动发现，需从自己的标记、Nsight 界面或样例说明取得名称。
+NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间区间与 NVTX 不能同时指定。报告 ID 仅在当前服务会话有效，重启后重新打开报告。v0.2 可用 `nsight_nvtx_summary` 发现范围，再用 `nsight_nvtx_trace` 查看 Push/Pop 实例；可直接使用返回的 `time_query`，不要把 `RangeId` 当作筛选序号。
+
+新增四个工具的提问：
+
+- “发现这份报告的 NVTX 范围，查看 Train 的单次范围明细。”
+- “打开优化后的报告，分别选择两份报告的 Train 范围，比较 kernel、API 和内存统计，说明次数是否变化。”
+- “把刚才的分析结果分别导出为 Markdown 和 JSON，标明这是哪些分页结果。”
+
+参数、真实样例和完整操作见 [v0.2 流程指南](WORKFLOW-v0.2.zh-CN.md)。
 
 ## 7. 正确阅读数字
 
@@ -149,7 +157,7 @@ NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间
 - CPU 侧 CUDA API 时间与 GPU kernel 执行时间是不同指标。
 - 时间/NVTX 筛选包含与范围重叠的完整事件，耗时不会裁剪到边界。
 - “没有匹配数据”不证明实际 GPU 没有活动；报告可能未采集所需事件。
-- CUDA kernel 与 PyTorch 算子不是一一对应，v0.1 不承诺框架算子归因、GPU 利用率诊断或瓶颈根因判定。
+- CUDA kernel 与 PyTorch 算子不是一一对应，v0.2 不承诺框架算子归因、GPU 利用率诊断或瓶颈根因判定。
 
 ## 8. 常见故障
 
@@ -165,6 +173,7 @@ NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间
 | 报告读取失败或版本不兼容 | 先用本机 Nsight 打开同一报告；较新的采集报告可能需要更新的 Windows reader |
 | 提示缺少 CUDA/NVTX 数据 | 确认采集时启用了 `--trace=cuda,nvtx`，或改用具有所需数据的报告 |
 | 结果为空 | 放宽名称、时间或 NVTX 筛选；核对范围名、域名、序号与时间单位 |
+| `Unknown or expired result_id` | 会话只保留最近 100 次分析；重新运行所需分析后导出 |
 | `Unknown report_id` | MCP 重启后重新打开报告；不要复用旧会话 ID |
 | `Unknown sort column` | 使用返回结果里的完整列名，例如 `Duration (ns)` 或 `Start (ns)` |
 | 超时 | 检查 300 秒工具超时是否生效；收窄查询范围。首次导出与复制仍需处理报告，可根据报告规模提高 `NSIGHT_TIMEOUT_SECONDS`，并将 Codex 超时设得更长 |

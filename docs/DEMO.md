@@ -77,3 +77,43 @@ Every result includes `provenance.executable` and `provenance.arguments`, which 
 ```
 
 Unlike the MCP service's isolated cache, this manual command may create an SQLite export alongside the supplied file. The integration tests compare all returned numeric fields with independently parsed direct CLI output and exercise the real MCP stdio transport.
+
+## 6. v0.2: discover the window and compare two captures
+
+Use `nsight_nvtx_summary` with `query.name_contains="Train"`, then `nsight_nvtx_trace` with the same filter. The baseline's Push/Pop `:Train` range starts at 9,629,695 ns and ends at 13,870,341,778 ns. Its `time_query` can be passed directly to kernel/API/memory analyses. It is a CPU annotation window, not GPU completion.
+
+Open `examples/reports/firstOptimization.nsys-rep` as candidate. Compare the two known `Train` NVTX ranges:
+
+```json
+{
+  "baseline_report_id":"BASELINE_ID",
+  "candidate_report_id":"CANDIDATE_ID",
+  "kind":"kernel_summary",
+  "baseline_scope":{"nvtx":"Train"},
+  "candidate_scope":{"nvtx":"Train"},
+  "query":{"name_contains":"wgrad_alg0_engine<float, (int)512","limit":1}
+}
+```
+
+These values were measured with Nsight Systems 2025.6.3:
+
+| Metric in Train | Baseline | Candidate | Candidate − baseline |
+| --- | ---: | ---: | ---: |
+| Selected wgrad kernel cumulative GPU time (ns) | 1,266,481,454 | 514,207,039 | −752,274,415 (−59.40%) |
+| Selected wgrad execution count | 938 | 938 | 0 |
+| Selected wgrad average GPU time (ns) | 1,350,193.4 | 548,195.1 | −801,998.3 |
+| cudaDeviceSynchronize CPU time (ns) | 45,885 | 50,322 | +4,437 (+9.67%) |
+| Host-to-Device copy time (ns) | 32,691,810 | 32,132,186 | −559,624 (−1.71%) |
+| Host-to-Device bytes | 188,640,000 | 188,640,000 | 0 |
+
+The complete Train comparisons match 41 kernel names, 11 CUDA API names and 3 memory-operation names. All corresponding counts are equal in this pair; added/removed and differing-count behavior is also covered by synthetic tests. Some metrics improve while others increase. These are measured differences between public tutorial captures, not a claim of controlled causal speedup.
+
+NVTX `Train` CPU annotation duration is 13,860,712,083 ns in baseline and 8,814,677,730 ns in candidate; this is distinct from cumulative GPU kernel time.
+
+Repeat comparison using `kind="cuda_api_summary"`, `"memory_time"`, and `"memory_size"`. Save their returned result IDs and export:
+
+```json
+{"result_ids":["KERNEL_RESULT_ID","API_RESULT_ID","MEMORY_TIME_RESULT_ID","MEMORY_SIZE_RESULT_ID"],"format":"markdown"}
+```
+
+Repeat with `format="json"`. Both exports retain the exact selected-page evidence, sources and commands. See [the full workflow](WORKFLOW-v0.2.md) or [中文流程](WORKFLOW-v0.2.zh-CN.md) for pagination, missing-side and upgrade behavior.

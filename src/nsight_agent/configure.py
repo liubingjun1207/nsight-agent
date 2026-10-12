@@ -84,5 +84,5 @@ def configure_codex() -> dict:
         "nsys": nsys,
         "startup_timeout_sec": 30,
         "tool_timeout_sec": 300,
-        "next_step": "Restart/reconnect Codex MCP, then ask it to call nsight_doctor and list six tools.",
+        "next_step": "Restart/reconnect Codex MCP, then ask it to call nsight_doctor and list ten tools.",
     }

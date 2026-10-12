@@ -2,11 +2,11 @@
 
 [English](README.md)
 
-第一次使用请先阅读 [中文入门指南](docs/GETTING_STARTED.zh-CN.md)：从零安装、验证连接、六个工具的提问示例、故障排查、更新和卸载。
+第一次使用请先阅读 [中文入门指南](docs/GETTING_STARTED.zh-CN.md)：从零安装、验证连接、十个工具的提问示例、故障排查、更新和卸载。
 
 让 Codex 通过 MCP 调用 **Nsight Systems 官方统计命令**，分析 CUDA kernel 执行时间、CUDA API 和内存操作。模型选择分析步骤、解释结果，原始报告交给 Nsight 处理。
 
-首版：Windows 分析 Linux 采集的报告。暂不包含 GUI 自动操作、远程采集、Nsight Compute 或 PyTorch 算子归因。
+v0.2：Windows 分析 Linux 采集的报告。暂不包含 GUI 自动操作、远程采集、Nsight Compute 或 PyTorch 算子归因。
 
 ## 安装与接入 Codex
 
@@ -55,11 +55,21 @@ python -m venv .venv
 
 完整接口、错误处理及运行限制见 [英文说明](README.md)。
 
+## v0.2：发现范围、对比与导出
+
+新增 `nsight_nvtx_summary` 和 `nsight_nvtx_trace`，先发现范围，再把明细里的 `time_query` 交给现有分析工具。明细支持 Push/Pop；Start/End 仅提供汇总。CPU 标记区间不代表 GPU 已完成，按时间查询也可能包含并发工作。
+
+`nsight_compare` 支持 kernel、CUDA API、内存耗时和字节数对比，两侧可以选择不同的时间/NVTX 范围。先匹配完整统计，再分页；新增和消失项不按实测零值处理。累计耗时变化不等于应用整体加速。
+
+`nsight_export_analysis` 使用分析返回的 `result_id` 导出 Markdown/JSON，不重新运行 Nsight。每个会话保留最近 100 次结果，导出包含选中页面、来源和本地路径，文件写入缓存目录下的 `exports`。
+
+详见 [完整 v0.2 流程与接口](docs/WORKFLOW-v0.2.zh-CN.md)。
+
 ## 正确理解结果
 
 Nsight 完成统计，服务只整理返回结果。时间范围筛选包含与区间重叠的完整事件；百分比沿用 Nsight 原始分母，不随名称筛选和分页重新计算。累计 kernel 时间不等于应用总耗时或 GPU 利用率，CPU API 时间也不等于 GPU 执行时间。
 
-每次返回包含 Nsight 版本、官方报告名、单位、筛选条件和可复现命令。缺失数据会说明或报错，不解释为零。首版不依据时间相关性直接断言瓶颈原因。
+每次返回包含 Nsight 版本、官方报告名、单位、筛选条件和可复现命令。缺失数据会说明或报错，不解释为零。本版不依据时间相关性直接断言瓶颈原因。
 
 原报告保持不变，服务在独立缓存中复制、导出并分析。停止服务后可以清理缓存中的 `session-*` 文件夹。分页限制模型收到的数据量；Nsight 本地仍需完成对应统计，大型 trace 建议先限定时间/NVTX。
 
