@@ -39,6 +39,8 @@ All existing query fields are supported. `descending` defaults to the catalog di
 
 Output retains official columns, units, source and reproduction commands. Unsupported schema/version/parameters, missing data and process failure carry error codes and recovery guidance. Missing data is not zero; a successful empty table/name filter means no matching recorded rows.
 
+Cache filesystem failures return `CACHE_IO_ERROR` with guidance to check permissions/free space or change `NSIGHT_CACHE_DIR`. Ordinary stderr diagnostics from successful commands are retained in `warnings`, including their command arguments. Explicit ERROR/FATAL, Python traceback and SKIPPED diagnostics still fail the call; CSV/schema validation remains mandatory. The known successful `stats --help-reports` exit status of 1 follows the same diagnostic rules.
+
 ## Interpret correctly
 
 Launch total durations can overlap phases. Null queue time can mean execution began before the API returned. Queueing is not automatically a bottleneck.

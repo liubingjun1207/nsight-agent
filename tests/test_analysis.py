@@ -271,3 +271,20 @@ def test_nvtx_missing_boundaries_not_reusable(service, monkeypatch):
         ),
     )
     assert service.query(service.baseline, "nvtx_trace")["rows"][0]["time_query"] is None
+
+
+@pytest.mark.parametrize("stage", ["directory", "write"])
+def test_export_cache_permission_error(service, monkeypatch, stage):
+    result = service.query(service.baseline, "kernel_summary")
+
+    def denied(*args, **kwargs):
+        raise PermissionError(13, "Access is denied", str(service.cache / "exports"))
+
+    if stage == "directory":
+        monkeypatch.setattr(Path, "mkdir", denied)
+    else:
+        monkeypatch.setattr(Path, "open", denied)
+    with pytest.raises(NsightError) as error:
+        service.export_analysis([result["result_id"]])
+    assert error.value.code == "CACHE_IO_ERROR"
+    assert "NSIGHT_CACHE_DIR" in error.value.recovery

@@ -35,3 +35,25 @@ def test_stdio_contract():
                 assert error.isError
 
     asyncio.run(check())
+
+
+def test_stdio_cache_error_is_actionable(tmp_path):
+    cache = tmp_path / "cache-file"
+    cache.write_bytes(b"not a directory")
+
+    async def check():
+        params = StdioServerParameters(
+            command=sys.executable,
+            args=["-m", "nsight_agent"],
+            env={"NSIGHT_CACHE_DIR": str(cache)},
+        )
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                error = await session.call_tool("nsight_doctor", {})
+                assert error.isError
+                message = "\n".join(item.text for item in error.content if item.type == "text")
+                assert "CACHE_IO_ERROR" in message and "NSIGHT_CACHE_DIR" in message
+                assert "Recovery:" in message and "Traceback" not in message
+
+    asyncio.run(check())

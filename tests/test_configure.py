@@ -1,3 +1,5 @@
+import json
+import sys
 import tomllib
 
 import pytest
@@ -40,6 +42,37 @@ trust_level = "trusted"
 def test_unusual_quoted_existing_table_fails_safely():
     with pytest.raises(NsightError, match="Cannot safely update"):
         render_config('[mcp_servers."nsight"]\ncommand="old"\n', "python", "nsys")
+
+
+def test_invalid_original_toml_is_actionable():
+    with pytest.raises(NsightError) as error:
+        render_config("broken = [", "python", "nsys")
+    assert error.value.code == "MCP_CONFIG_INVALID"
+    assert "config.toml" in error.value.recovery
+    assert isinstance(error.value.__cause__, tomllib.TOMLDecodeError)
+
+
+def test_setup_cli_invalid_toml_preserves_original(tmp_path, monkeypatch, capsys):
+    from nsight_agent.server import main
+
+    config = tmp_path / "config.toml"
+    original = b"broken = ["
+    config.write_bytes(original)
+    nsys = tmp_path / "nsys.exe"
+    nsys.touch()
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    monkeypatch.setattr("nsight_agent.configure.discover_nsys", lambda: nsys)
+    monkeypatch.setattr("nsight_agent.health.run_probe", lambda **kw: {"status": "connected"})
+    monkeypatch.setattr(sys, "argv", ["nsight-agent", "--setup"])
+    with pytest.raises(SystemExit) as exit_status:
+        main()
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert exit_status.value.code == 1
+    assert result["status"] == "error" and result["code"] == "MCP_CONFIG_INVALID"
+    assert result["recovery"] and not output.err
+    assert config.read_bytes() == original
+    assert set(tmp_path.iterdir()) == {config, nsys}
 
 
 def test_configure_backs_up_and_preserves_config(tmp_path, monkeypatch):

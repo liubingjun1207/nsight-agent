@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -233,3 +234,141 @@ def test_help_reports_exit_one(tmp_path, monkeypatch):
     assert svc._run(["stats", "--help-reports"], tmp_path) == message
     with pytest.raises(NsightError):
         svc._run(["stats", "--report", "cuda_api_sum"], tmp_path)
+
+
+@pytest.mark.parametrize("stage", ["doctor", "probe", "query", "session", "copy", "run"])
+def test_cache_permissions_are_actionable(service, monkeypatch, stage):
+    def denied(*args, **kwargs):
+        raise PermissionError(13, "Access is denied", str(service.cache))
+
+    if stage in ("doctor", "query"):
+        original = Path.mkdir
+
+        def mkdir(path, *args, **kwargs):
+            if path == service.cache:
+                denied()
+            return original(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "mkdir", mkdir)
+    elif stage in ("probe", "run"):
+        monkeypatch.setattr("nsight_agent.core.tempfile.TemporaryDirectory", denied)
+    elif stage == "session":
+        monkeypatch.setattr("nsight_agent.core.tempfile.mkdtemp", denied)
+    else:
+        monkeypatch.setattr("nsight_agent.core.shutil.copyfile", denied)
+
+    with pytest.raises(NsightError) as error:
+        if stage in ("doctor", "probe"):
+            service.doctor()
+        else:
+            service.query(service.test_id, "kernel_summary")
+    result = error.value.as_dict()
+    assert result["code"] == "CACHE_IO_ERROR"
+    assert "NSIGHT_CACHE_DIR" in result["recovery"]
+    assert isinstance(error.value.__cause__, PermissionError)
+    assert not service._results
+
+
+def test_doctor_cli_cache_error_is_structured(service, monkeypatch, capsys):
+    from nsight_agent.server import main
+
+    service.cache.write_bytes(b"A file cannot serve as a cache directory")
+    monkeypatch.setattr("nsight_agent.server.service", service)
+    monkeypatch.setattr(sys, "argv", ["nsight-agent", "--doctor"])
+    with pytest.raises(SystemExit) as exit_status:
+        main()
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert exit_status.value.code == 1 and not output.err
+    assert result["code"] == "CACHE_IO_ERROR" and result["recovery"]
+
+
+def test_warning_allows_valid_csv_and_does_not_leak_to_next_query(service, monkeypatch):
+    monkeypatch.delattr(service, "_run")
+    responses = iter(
+        [
+            subprocess.CompletedProcess([], 0, SUMMARY, "WARNING: optional feature unavailable"),
+            subprocess.CompletedProcess([], 0, SUMMARY, ""),
+        ]
+    )
+    monkeypatch.setattr("nsight_agent.core.run_process", lambda *a, **kw: next(responses))
+    first = service.query(service.test_id, "kernel_summary")
+    assert first["rows"][0]["Total Time (ns)"] == 3000
+    assert first["warnings"] == [
+        {
+            "arguments": first["provenance"]["arguments"],
+            "message": "WARNING: optional feature unavailable",
+        }
+    ]
+    second = service.query(service.test_id, "kernel_summary")
+    assert second["warnings"] == []
+    assert service._results[first["result_id"]]["warnings"] == first["warnings"]
+
+
+@pytest.mark.parametrize(
+    "diagnostic,code",
+    [
+        ("WARNING: info\nSKIPPED: missing CUDA", "MISSING_DATA"),
+        ("[ERROR] failed to open report", "COMMAND_FAILED"),
+        ("ERROR: cannot process database", "COMMAND_FAILED"),
+        ("FATAL: invalid report", "COMMAND_FAILED"),
+        ("Traceback (most recent call last):\nRuntimeError: failed", "COMMAND_FAILED"),
+    ],
+)
+def test_zero_exit_fatal_diagnostic_rejects_valid_csv(service, monkeypatch, diagnostic, code):
+    monkeypatch.delattr(service, "_run")
+    monkeypatch.setattr(
+        "nsight_agent.core.run_process",
+        lambda *a, **kw: subprocess.CompletedProcess([], 0, SUMMARY, diagnostic),
+    )
+    with pytest.raises(NsightError) as error:
+        service.query(service.test_id, "kernel_summary")
+    assert error.value.code == code
+    assert not service._results
+
+
+def test_warning_does_not_hide_missing_csv(service, monkeypatch):
+    monkeypatch.delattr(service, "_run")
+    monkeypatch.setattr(
+        "nsight_agent.core.run_process",
+        lambda *a, **kw: subprocess.CompletedProcess([], 0, "", "WARNING: no table produced"),
+    )
+    with pytest.raises(NsightError) as error:
+        service.query(service.test_id, "kernel_summary")
+    assert error.value.code == "MISSING_DATA" and not service._results
+
+
+def test_doctor_discovery_with_warnings(service, monkeypatch):
+    monkeypatch.delattr(service, "_run")
+
+    def run(args, **kwargs):
+        if args[1:] == ["--version"]:
+            return subprocess.CompletedProcess(args, 0, "2025.6.3", "WARNING: version info")
+        if args[1:] == ["stats", "--help"]:
+            return subprocess.CompletedProcess(args, 0, "--report --format --quiet", "")
+        return subprocess.CompletedProcess(
+            args,
+            1,
+            "The following built-in reports are available:\n  cuda_api_sum -- CUDA API Summary\n",
+            "WARNING: optional feature unavailable",
+        )
+
+    monkeypatch.setattr("nsight_agent.core.run_process", run)
+    result = service.doctor()
+    assert result["version"] == "2025.6.3"
+    assert result["reports"] == ["cuda_api_sum"]
+    assert len(result["warnings"]) == 2
+    assert result["warnings"][1]["arguments"] == ["stats", "--help-reports"]
+
+
+def test_help_reports_exit_one_does_not_hide_errors(service, monkeypatch):
+    monkeypatch.delattr(service, "_run")
+    monkeypatch.setattr(
+        "nsight_agent.core.run_process",
+        lambda *a, **kw: subprocess.CompletedProcess(
+            [], 1, "The following built-in reports are available:", "ERROR: report discovery failed"
+        ),
+    )
+    with pytest.raises(NsightError) as error:
+        service._run(["stats", "--help-reports"], service.cache.parent)
+    assert error.value.code == "COMMAND_FAILED"

@@ -13,6 +13,7 @@ import signal
 import subprocess
 import tempfile
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -36,7 +37,7 @@ ALL_REPORTS = REPORTS | OPTIONAL_REPORTS
 class NsightError(RuntimeError):
     """An actionable error safe to surface through MCP."""
 
-    def __init__(self, message: str, *, code: str | None = None):
+    def __init__(self, message: str, *, code: str | None = None, recovery: str | None = None):
         mappings = [
             (
                 "CLI not found",
@@ -88,7 +89,7 @@ class NsightError(RuntimeError):
         ]
         matched = next((item for item in mappings if item[0] in message), None)
         self.code = code or (matched[1] if matched else "NSIGHT_ERROR")
-        self.recovery = (
+        self.recovery = recovery or (
             matched[2]
             if matched
             else "Check the error detail and tool parameters; do not treat this as a zero measurement."
@@ -297,6 +298,20 @@ class NsightService(AnalysisMixin, CatalogMixin):
         self._lock = threading.RLock()
         self._session_cache: Path | None = None
         self._results: dict[str, dict] = {}
+        self._warnings: list[dict] = []
+
+    @contextmanager
+    def _cache_io(self):
+        """Translate cache filesystem failures for both CLI and MCP callers."""
+        try:
+            yield
+        except OSError as exc:
+            raise NsightError(
+                f"Cannot access Nsight cache {self.cache}: {exc}",
+                code="CACHE_IO_ERROR",
+                recovery="Set NSIGHT_CACHE_DIR to a writable directory with enough free space, "
+                "check the reported file permissions, then retry.",
+            ) from exc
 
     def _run(self, args: list[str], cwd: Path) -> str:
         env = os.environ.copy()
@@ -318,24 +333,37 @@ class NsightService(AnalysisMixin, CatalogMixin):
         except OSError as exc:
             raise NsightError(f"Cannot execute Nsight: {exc}") from exc
         # Nsight 2025.6 returns exit 1 for this successful discovery command.
-        if (
+        help_reports_success = (
             args == ["stats", "--help-reports"]
             and result.returncode == 1
             and "The following built-in reports are available:" in result.stdout
-            and not result.stderr.strip()
-        ):
-            return result.stdout
-        if result.returncode:
+        )
+        if result.returncode and not help_reports_success:
             detail = (result.stderr or result.stdout).strip()[-3000:]
             raise NsightError(f"Nsight failed (exit {result.returncode}): {detail}")
         # Some Nsight reports skip missing data without failing the process.
         diagnostic = result.stderr.strip()
+        prefix = r"(?im)^\s*(?:\[[^\]\n]+\]\s*)*"
+        if re.search(prefix + r"\[?SKIPPED\b", diagnostic):
+            raise NsightError(
+                f"Nsight skipped the requested statistics: {diagnostic[-3000:]}",
+                code="MISSING_DATA",
+                recovery="Check capture traces and range filters; missing data is not zero activity.",
+            )
+        if re.search(prefix + r"\[?(?:ERROR|FATAL)\b", diagnostic) or re.search(
+            r"(?m)^\s*Traceback \(most recent call last\):", diagnostic
+        ):
+            raise NsightError(
+                f"Nsight failed despite its exit status: {diagnostic[-3000:]}",
+                code="COMMAND_FAILED",
+            )
         if diagnostic:
-            raise NsightError(f"Nsight diagnostic (result not accepted): {diagnostic[-3000:]}")
+            self._warnings.append({"arguments": list(args), "message": diagnostic[-3000:]})
         return result.stdout
 
     def doctor(self) -> dict:
-        with self._lock:
+        with self._lock, self._cache_io():
+            self._warnings = []
             self.cache.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryDirectory(prefix="probe-", dir=self.cache) as directory:
                 cwd = Path(directory)
@@ -362,6 +390,7 @@ class NsightService(AnalysisMixin, CatalogMixin):
                 },
                 "service_reports": list(CATALOG),
                 "missing_service_reports": sorted(set(CATALOG) - set(available)),
+                "warnings": list(self._warnings),
             }
             return dict(self._capabilities)
 
@@ -396,6 +425,7 @@ class NsightService(AnalysisMixin, CatalogMixin):
     ):
         if report_name not in CATALOG:
             raise NsightError("Report outside the fixed CUDA/NVTX allowlist.", code="OUT_OF_SCOPE")
+        self._warnings = []
         capabilities = self._capabilities or self.doctor()
         if report_name not in capabilities["reports"]:
             raise NsightError(f"Installed Nsight does not support {report_name}.")
@@ -427,38 +457,39 @@ class NsightService(AnalysisMixin, CatalogMixin):
         if report is None:
             raise NsightError("Unknown report_id; call nsight_open_report first.")
         self._check_source(report)
-        if self._session_cache is None:
-            self.cache.mkdir(parents=True, exist_ok=True)
-            self._session_cache = Path(tempfile.mkdtemp(prefix="session-", dir=self.cache))
-        workspace = self._session_cache / report_id
-        workspace.mkdir(parents=True, exist_ok=True)
-        # Never let Nsight open the original SQLite, even if it creates sidecars.
-        local = workspace / ("input" + report.path.suffix.lower())
-        if not local.exists():
-            partial = workspace / "input.partial"
-            shutil.copyfile(report.path, partial)
-            self._check_source(report)
-            partial.replace(local)
-        if local.suffix == ".nsys-rep":
-            exported = workspace / "export.sqlite"
-            if not exported.exists():
-                # Export to a temporary directory so failed/partial exports are never reused.
-                with tempfile.TemporaryDirectory(prefix="export-", dir=workspace) as directory:
-                    temporary = Path(directory) / "report.sqlite"
-                    self._run(
-                        [
-                            "export",
-                            "--type=sqlite",
-                            "--quiet=true",
-                            f"--output={temporary.resolve()}",
-                            str(local.resolve()),
-                        ],
-                        Path(directory),
-                    )
-                    if not temporary.is_file():
-                        raise NsightError("Nsight export did not create a SQLite report.")
-                    temporary.replace(exported)
-            local = exported
+        with self._cache_io():
+            if self._session_cache is None:
+                self.cache.mkdir(parents=True, exist_ok=True)
+                self._session_cache = Path(tempfile.mkdtemp(prefix="session-", dir=self.cache))
+            workspace = self._session_cache / report_id
+            workspace.mkdir(parents=True, exist_ok=True)
+            # Never let Nsight open the original SQLite, even if it creates sidecars.
+            local = workspace / ("input" + report.path.suffix.lower())
+            if not local.exists():
+                partial = workspace / "input.partial"
+                shutil.copyfile(report.path, partial)
+                self._check_source(report)
+                partial.replace(local)
+            if local.suffix == ".nsys-rep":
+                exported = workspace / "export.sqlite"
+                if not exported.exists():
+                    # Export to a temporary directory so failed/partial exports are never reused.
+                    with tempfile.TemporaryDirectory(prefix="export-", dir=workspace) as directory:
+                        temporary = Path(directory) / "report.sqlite"
+                        self._run(
+                            [
+                                "export",
+                                "--type=sqlite",
+                                "--quiet=true",
+                                f"--output={temporary.resolve()}",
+                                str(local.resolve()),
+                            ],
+                            Path(directory),
+                        )
+                        if not temporary.is_file():
+                            raise NsightError("Nsight export did not create a SQLite report.")
+                        temporary.replace(exported)
+                local = exported
         args = [
             "stats",
             "--report",
@@ -477,7 +508,10 @@ class NsightService(AnalysisMixin, CatalogMixin):
             args += [f"--filter-time={start}/{end}"]
         args.append(str(local.resolve()))
         # An empty working directory prevents shadowing NVIDIA's built-in reports.
-        with tempfile.TemporaryDirectory(prefix="run-", dir=self.cache) as directory:
+        with (
+            self._cache_io(),
+            tempfile.TemporaryDirectory(prefix="run-", dir=self.cache) as directory,
+        ):
             stdout = self._run(args, Path(directory))
         columns, rows = parse_csv(stdout, set(CATALOG[report_name].required))
         return columns, rows, capabilities, args
@@ -564,6 +598,7 @@ class NsightService(AnalysisMixin, CatalogMixin):
                 "offset": query.offset if paginate else 0,
                 "next_offset": next_offset if next_offset < total else None,
                 "provenance": {"executable": capabilities["nsys_path"], "arguments": args},
+                "warnings": list(self._warnings),
                 "semantics": [
                     "Nsight includes events overlapping the selected range; event durations are not clipped.",
                     "Time (%) retains Nsight's denominator before name filtering and pagination.",

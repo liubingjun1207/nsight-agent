@@ -280,7 +280,7 @@ class AnalysisMixin:
             raise NsightError("Export format must be markdown or json.")
         if not result_ids or len(result_ids) > 100:
             raise NsightError("Select 1 to 100 result IDs.")
-        with self._lock:
+        with self._lock, self._cache_io():
             if any(r not in self._results for r in result_ids):
                 raise NsightError(
                     "Unknown or expired result_id; rerun the analysis (last 100 results per session retained)."

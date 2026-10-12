@@ -21,7 +21,14 @@ def render_config(
     original: str, python: str, nsys: str, *, required=False, tool_timeout=300
 ) -> str:
     """Replace only the nsight table family, preserving unrelated TOML text and meaning."""
-    before = tomllib.loads(original)
+    try:
+        before = tomllib.loads(original)
+    except tomllib.TOMLDecodeError as exc:
+        raise NsightError(
+            f"Existing Codex config.toml contains invalid TOML: {exc}. No file was written.",
+            code="MCP_CONFIG_INVALID",
+            recovery="Fix the TOML syntax in config.toml, then rerun setup; keep your other settings.",
+        ) from exc
     sections = re.split(r"(?m)(?=^[ \t]*\[)", original)
     kept = []
     for section in sections:

@@ -187,6 +187,8 @@ NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间
 | `missing_reports` 非空或选项不支持 | 检查 Nsight 版本；升级到已支持所需官方报告的版本，再运行 doctor |
 | Codex 中没有工具 | 检查 MCP 服务启用状态、Python 路径与配置位置；重新连接或重启客户端 |
 | 工具启动失败 | 在终端运行相同 Python 的 `--doctor`；不要用别的 Python 检查后就认为配置正确 |
+| `MCP_CONFIG_INVALID` | 修复 `config.toml` 的 TOML 语法后重新运行 `--setup`；配置解析失败时不会改写原文件 |
+| `CACHE_IO_ERROR` | 将 `NSIGHT_CACHE_DIR` 设置为可写且空间充足的目录，检查错误中指出的文件权限，再重试 |
 | 报告路径无效 | 用 `Resolve-Path` 获取绝对路径；确认文件在当前 Windows 机器上，不是仅存在于 Linux 服务器 |
 | 报告读取失败或版本不兼容 | 先用本机 Nsight 打开同一报告；较新的采集报告可能需要更新的 Windows reader |
 | 提示缺少 CUDA/NVTX 数据 | 确认采集时启用了 `--trace=cuda,nvtx`，或改用具有所需数据的报告 |
@@ -196,6 +198,8 @@ NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间
 | `Unknown sort column` | 使用返回结果里的完整列名，例如 `Duration (ns)` 或 `Start (ns)` |
 | 超时 | 检查 600 秒工具超时是否生效；收窄查询范围。首次导出与复制仍需处理报告，可根据报告规模提高 `NSIGHT_TIMEOUT_SECONDS`，并将 Codex 超时设得更长 |
 | 磁盘空间不足 | 改用容量充足的 `NSIGHT_CACHE_DIR`；停止服务后清理旧会话缓存 |
+
+Nsight 退出码为 0 时，普通 stderr 信息会保存在结果的 `warnings` 中，不会单独导致调用失败。明确的 `ERROR`、`FATAL`、异常 traceback 或 `SKIPPED` 诊断仍返回错误；统计结果还必须通过 CSV 格式和报告列校验，缺失数据不会被当成零耗时。
 
 错误信息、Nsight 版本、工具名和去除敏感内容后的复现步骤可以用于提交问题；不需要上传自己的完整业务报告。
 

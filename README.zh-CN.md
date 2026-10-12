@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-第一次使用请先阅读 [中文入门指南](docs/GETTING_STARTED.zh-CN.md)：从零安装、验证连接、十个工具的提问示例、故障排查、更新和卸载。
+第一次使用请先阅读 [中文入门指南](docs/GETTING_STARTED.zh-CN.md)：从零安装、验证连接、十二个工具的提问示例、故障排查、更新和卸载。
 
 [最终范围](docs/PROJECT_SCOPE.zh-CN.md) 固定为 18 个 CUDA/NVTX 官方报告。[验收要求](docs/ACCEPTANCE.zh-CN.md) 分别检查数值正确性、真实模型流程和安装发布体验，通过后进入维护阶段。
 
