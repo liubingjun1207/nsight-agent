@@ -4,7 +4,7 @@
 
 New users: follow the [step-by-step Chinese onboarding guide](docs/GETTING_STARTED.zh-CN.md), including connection checks, prompts for every tool, troubleshooting, updates and removal.
 
-The [final project scope](docs/PROJECT_SCOPE.zh-CN.md) fixes v1.0 to 18 official CUDA/NVTX reports and a verified Codex workflow. The [three acceptance layers](docs/ACCEPTANCE.zh-CN.md) cover numeric correctness, real model usage and installation from release artifacts. After acceptance, development moves to maintenance.
+The [project scope](docs/PROJECT_SCOPE.zh-CN.md) retains 18 official CUDA/NVTX reports and defines the finite v1.1 extension. The [three acceptance layers](docs/ACCEPTANCE.zh-CN.md) cover numeric correctness, real model usage and installation from artifacts.
 
 Ask Codex about CUDA kernel timing. This local MCP server calls **NVIDIA Nsight Systems**, returns structured official statistics, and lets Codex explain the evidence or drill down. It does not send raw profiling databases to the model or implement a second profiling engine.
 
@@ -12,9 +12,11 @@ Ask Codex about CUDA kernel timing. This local MCP server calls **NVIDIA Nsight 
 Your question → Codex → MCP tools → nsys stats → structured results → Codex
 ```
 
-This release targets Windows analysis of Linux captures. GUI automation, remote collection, Nsight Compute and framework-operator attribution are outside this project. No separate model API key is required by this server.
+v1.1 adds Windows/Linux local Systems collection, recorded PyTorch eager NVTX associations and optional Compute report metrics. See [the extension guide](docs/EXTENSIONS.md) and [actual platform validation](docs/VALIDATION-v1.1.md). GUI automation, remote management, Compute collection and compiled/fused graph attribution remain excluded. No separate model API key is required by this server.
 
 ## Install and connect
+
+Linux source users can run `bash install.sh` or use `.venv/bin/python` for the commands below. Run Codex and this STDIO server on the host owning the reports/workload; this project supplies no remote transport.
 
 Requirements: Python 3.11+, NVIDIA Nsight Systems (tested with 2025.6.3), and a `.nsys-rep` or Nsight-exported `.sqlite`. A GPU is needed to capture the example workload, not to analyze an existing report.
 
@@ -66,8 +68,14 @@ The wheel includes the analysis skill; `--setup` installs it into `~/.codex/skil
 | `nsight_nvtx_trace` | `nvtx_pushpop_trace`: individual Push/Pop ranges and reusable time windows |
 | `nsight_compare` | Compare full official kernel/API/memory tables before pagination |
 | `nsight_export_analysis` | Export immutable selected result pages as Markdown or JSON |
+| `nsight_capture_targets` | Discover local owner-configured tasks and time limits |
+| `nsight_capture` | Run bounded `nsys profile` on one configured target; register its report |
+| `nsight_operator_summary` | Recorded eager operator NVTX/kernel launch associations |
+| `nsight_compute_doctor` | Optional Compute installation and fixed metric catalog |
+| `nsight_compute_open_report` | Register a separate `.ncu-rep` |
+| `nsight_compute_metrics` | Occupancy/throughput/memory/stalls/launch metrics, units and missing data |
 
-Analyses accept `report_id` and an optional `query` object:
+Systems analyses accept `report_id` and an optional `query` object. Capture and Compute parameters are described in [the extension guide](docs/EXTENSIONS.md):
 
 ```json
 {"report_id":"ID_FROM_OPEN", "query":{"name_contains":"gemm", "limit":10}}
@@ -111,7 +119,7 @@ See [the reproducible demo](docs/DEMO.md) and [Linux collection instructions](ex
 - Nsight computes the statistics. Python parses, filters, sorts and paginates them; comparisons subtract official aggregates without recomputing their statistics.
 - Time/NVTX filters include overlapping events with full durations, not clipped durations. `Time (%)` retains the official denominator before name filtering or pagination.
 - Cumulative kernel time is not application wall time or GPU utilization; concurrent kernels may overlap. CPU API duration is not GPU execution time.
-- No rows or missing capture data cannot establish zero activity or a root cause. Framework operators need additional attribution that this release does not provide.
+- No rows or missing capture data cannot establish zero activity or a root cause. Operator associations require recorded NVTX labels; full framework/fusion attribution is not provided.
 - The original report is copied into an isolated cache. `.nsys-rep` is exported with `nsys export`; all `nsys stats` commands operate on the cached SQLite. Registration is lazy, so a corrupt report fails at first analysis rather than registration.
 - Local profiling data stays on disk; selected result rows are returned to the connected model. No HTTP listener or telemetry is started by this service. Export files contain the selected evidence and local paths.
 - Commands use fixed reports, argument arrays, a private working directory and a timeout. The service does not expose shell commands, SQL, or arbitrary report scripts. It removes report-path/Python-path overrides from the child environment.
@@ -133,7 +141,7 @@ $env:NSIGHT_INTEGRATION = '1'
 python -m pytest -m integration -v
 ```
 
-CI runs GPU-free tests and builds on Windows and Linux, Python 3.11/3.13. This is not a claim of Linux runtime certification. Real Windows/Linux-report integration is a separate release gate; see [validation notes](docs/VALIDATION.md).
+CI runs GPU-free tests and builds on Windows and Linux, Python 3.11/3.13. GPU/reader validation is separate and limited to the environments recorded in [v1.1 validation](docs/VALIDATION-v1.1.md); [v1.0 results](docs/VALIDATION.md) remain historical evidence.
 
 The service uses the [official MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk/tree/v1.27.0), [Codex MCP integration](https://developers.openai.com/codex/mcp), and [Nsight Systems CLI](https://docs.nvidia.com/nsight-systems/UserGuide/).
 

@@ -54,7 +54,7 @@ CASES = {
         "reports": set(),
     },
     "diagnostics": {
-        "question": "先尝试打开 missing_report 路径并说明错误；然后打开 baseline，查询 Start/End NVTX 汇总（样例可能没有该事件）与名称包含 NO_SUCH_KERNEL_42 的 kernel 汇总，区别缺少数据和无匹配。最后说明这个服务能否分析 Nsight Compute 的 SM occupancy。不要把未知或缺失数据写成零。",
+        "question": "先尝试打开 missing_report 路径并说明错误；然后打开 baseline，查询 Start/End NVTX 汇总（样例可能没有该事件）与名称包含 NO_SUCH_KERNEL_42 的 kernel 汇总，区别缺少数据和无匹配。最后说明能否从这份 Systems 报告得到 Compute 的 SM occupancy，需要什么额外报告。不要把未知或缺失数据写成零。",
         "tools": {
             "nsight_capabilities",
             "nsight_open_report",
@@ -62,6 +62,20 @@ CASES = {
             "nsight_kernel_summary",
         },
         "reports": {"nvtx_startend_sum"},
+    },
+    "extensions": {
+        "question": "列出登记的本地采集任务，仅运行 capture_target 一次；使用刚生成的 report_id 列出最耗时的三个 kernel 和 aten::mm 算子与 kernel 的关联（最多三行），说明嵌套关联不能直接相加。再打开 compute_report，依次查询 occupancy、throughput、memory、stalls、launch 五组，每组最多三行；说明单位、未采集的指标和 replay 限制。把算子关联和五组 Compute 证据导出成 JSON，返回路径。不要自动配对两个采集中的 kernel，也不要修改训练代码。",
+        "tools": {
+            "nsight_capture_targets",
+            "nsight_capture",
+            "nsight_kernel_summary",
+            "nsight_operator_summary",
+            "nsight_compute_doctor",
+            "nsight_compute_open_report",
+            "nsight_compute_metrics",
+            "nsight_export_analysis",
+        },
+        "reports": {"cuda_gpu_kern_sum", "nvtx_kern_sum"},
     },
 }
 
@@ -174,6 +188,31 @@ def inspect_events(events, case):
                     or (item.get("tool") == "nsight_stats" and "MISSING_DATA" in text)
                 ):
                     errors.append("Unexpected diagnostic failure.")
+    if case == "extensions":
+        captured = {r.get("report_id") for r in records if r.get("status") == "captured"}
+        associated = [
+            r for r in records if r.get("association") == "recorded_nvtx_launch_containment"
+        ]
+        if not captured or not any(
+            r.get("report_id") in captured and r.get("rows") for r in associated
+        ):
+            errors.append("No recorded operator evidence from the newly captured task.")
+        metrics = [r for r in records if r.get("engine") == "nsight_compute"]
+        if {r.get("metric_group") for r in metrics} != {
+            "occupancy",
+            "throughput",
+            "memory",
+            "stalls",
+            "launch",
+        }:
+            errors.append("Five actual Compute metric groups were not queried.")
+        if not all(
+            r.get("rows") and all("Metric Unit" in row for row in r["rows"]) for r in metrics
+        ):
+            errors.append("Compute metric rows/units missing.")
+        paths = [r["path"] for r in records if r.get("format") == "json"]
+        if not paths or not all(Path(p).is_file() for p in paths):
+            errors.append("No actual JSON evidence export.")
     return {
         "passed": not errors,
         "errors": errors,
@@ -190,9 +229,21 @@ def main():
     parser.add_argument("--case", choices=CASES, action="append")
     parser.add_argument("--repetitions", type=int, default=1)
     parser.add_argument("--timeout", type=int, default=900)
+    parser.add_argument(
+        "--capture-target", help="Preconfigured annotated eager task for --case extensions"
+    )
+    parser.add_argument(
+        "--compute-report", type=Path, help="Existing .ncu-rep for --case extensions"
+    )
     args = parser.parse_args()
     if args.repetitions < 1 or args.timeout < 1:
         parser.error("Positive repetitions/timeout required.")
+    if "extensions" in (args.case or []) and not (
+        args.capture_target and args.compute_report and os.environ.get("NSIGHT_CAPTURE_CONFIG")
+    ):
+        parser.error(
+            "extensions requires --capture-target, --compute-report and NSIGHT_CAPTURE_CONFIG"
+        )
     codex = shutil.which("codex")
     if not codex:
         parser.error("Install Codex CLI and sign in first.")
@@ -208,7 +259,13 @@ def main():
         + json.dumps(sys.executable)
         + ',args=["-m","nsight_agent"],enabled=true,required=true,startup_timeout_sec=30,tool_timeout_sec=600,default_tools_approval_mode="approve",env={NSIGHT_NSYS_PATH='
         + json.dumps(nsys)
-        + ',PYTHONIOENCODING="utf-8"}}'
+        + ',PYTHONIOENCODING="utf-8"'
+        + "".join(
+            "," + key + "=" + json.dumps(os.environ[key])
+            for key in ("NSIGHT_CAPTURE_CONFIG", "NSIGHT_NCU_PATH", "NSIGHT_CACHE_DIR")
+            if key in os.environ
+        )
+        + "}}"
     )
     common = [
         codex,
@@ -228,13 +285,15 @@ def main():
     candidate = (args.reports_dir / "firstOptimization.nsys-rep").resolve()
     header = f"这是 Nsight Agent 的产品验证。只使用 nsight MCP 工具进行分析，不执行 shell、SQL、网页或编辑代码。先发现可调用能力；只查询本次问题要求的报告，不要输出整份原始报告。baseline={baseline}\n"
     results = []
-    for case in args.case or list(CASES):
+    for case in args.case or [name for name in CASES if name != "extensions"]:
         for repetition in range(1, args.repetitions + 1):
             context = ""
             if case == "compare":
                 context = f"candidate={candidate}\n"
             elif case == "diagnostics":
                 context = f"missing_report={args.output_dir / 'does-not-exist.nsys-rep'}\n"
+            elif case == "extensions":
+                context = f"capture_target={args.capture_target}\ncompute_report={args.compute_report.resolve()}\n"
             log = args.output_dir / f"{case}-{repetition}.jsonl"
             answer = args.output_dir / f"{case}-{repetition}-answer.md"
             stderr = args.output_dir / f"{case}-{repetition}-stderr.txt"

@@ -2,13 +2,13 @@
 
 [English](README.md)
 
-第一次使用请先阅读 [中文入门指南](docs/GETTING_STARTED.zh-CN.md)：从零安装、验证连接、十二个工具的提问示例、故障排查、更新和卸载。
+第一次使用请先阅读 [中文入门指南](docs/GETTING_STARTED.zh-CN.md)：从零安装、验证连接、十八个工具的提问示例、故障排查、更新和卸载。
 
-[最终范围](docs/PROJECT_SCOPE.zh-CN.md) 固定为 18 个 CUDA/NVTX 官方报告。[验收要求](docs/ACCEPTANCE.zh-CN.md) 分别检查数值正确性、真实模型流程和安装发布体验，通过后进入维护阶段。
+[最终范围](docs/PROJECT_SCOPE.zh-CN.md) 保留 18 个 CUDA/NVTX 官方报告，并明确 v1.1 的有限扩展。[验收要求](docs/ACCEPTANCE.zh-CN.md) 分别检查数值正确性、真实模型流程和安装发布体验。
 
 让 Codex 通过 MCP 调用 **Nsight Systems 官方统计命令**，分析 CUDA kernel 执行时间、CUDA API 和内存操作。模型选择分析步骤、解释结果，原始报告交给 Nsight 处理。
 
-v1.0：Windows 分析 Linux 采集的报告。暂不包含 GUI 自动操作、远程采集、Nsight Compute 或 PyTorch 算子归因。
+v1.1：Windows/Linux 本地分析与受控 Systems 采集，支持已记录的 PyTorch eager NVTX 算子关联，以及可选 Compute 报告指标。Linux 验证环境、适用条件与限制见 [扩展使用指南](docs/EXTENSIONS.zh-CN.md) 和 [真实验证记录](docs/VALIDATION-v1.1.md)。不包含 GUI、远程管理、Compute 自动采集或编译/融合图自动归因。
 
 ## 安装与接入 Codex
 
@@ -26,6 +26,8 @@ python -m venv .venv
 源码包也可执行 `powershell -File .\install.ps1`，完成环境创建、安装、接入及样例检查。`--setup` 先完成真实 STDIO 验证，再备份配置、设置 required 服务和 30 秒启动/600 秒工具超时，并安装打包的分析 skill；自定义 skill 会保留。也可使用 [英文说明中的配置片段](README.md#install-and-connect) 手动配置。`NSIGHT_NSYS_PATH` 可覆盖自动发现，`NSIGHT_TIMEOUT_SECONDS` 默认 120 秒，`NSIGHT_CACHE_DIR` 可指定缓存目录。配置后重新连接 MCP 服务。
 
 `--check-connection --report 报告路径` 可验证实际注册环境的工具与样例。required 服务启动失败时 Codex 会明确报错，需修复路径或禁用/移除服务；SDK 检查不等于模型流程验收。
+
+Linux 源码包可运行 `bash install.sh`，或使用 `.venv/bin/python` 执行相同安装、setup 和连接检查。[Linux 安装、采集任务登记与 Compute 配置](docs/EXTENSIONS.zh-CN.md)。
 
 ## 使用
 
@@ -58,6 +60,8 @@ python -m venv .venv
 完整接口、错误处理及运行限制见 [英文说明](README.md)。
 
 ## 统一能力入口与分析流程
+
+v1.1 新增：`nsight_capture_targets`、`nsight_capture`、`nsight_operator_summary`、`nsight_compute_doctor`、`nsight_compute_open_report`、`nsight_compute_metrics`。采集仅运行用户预先登记的本地任务；Compute 只读独立 `.ncu-rep`，不从 Systems 报告推测硬件计数器。
 
 `nsight_capabilities` 列出服务允许的 18 个报告、可用状态、字段和排序；`nsight_stats` 提供统一调用入口。发射/排队、API 明细、GPU 投影等问题无需等待增加专用工具。[完整报告目录](docs/REPORTS.md) 列出实际接口。
 

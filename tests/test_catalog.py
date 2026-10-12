@@ -132,7 +132,23 @@ def test_connection_checker_detects_hidden_or_disabled_tools(tmp_path):
     assert check_connection(config_path=config)["code"] == "MCP_NOT_ENABLED"
     config.write_text('[mcp_servers.nsight]\ncommand="python"\ndisabled_tools=["nsight_stats"]\n')
     assert check_connection(config_path=config)["code"] == "TOOLS_DISABLED"
-    assert len(TOOLS) == 12
+    assert len(TOOLS) == 18
+
+
+def test_operator_association_requires_recorded_labels(service, monkeypatch):
+    monkeypatch.setattr(
+        service,
+        "_run",
+        lambda *a: (
+            "Kernel Name,NVTX Range,Total Time (ns),NVTX Inst,Kern Inst\n"
+            "gemm,aten::mm,100,1,1\nother,training_step,200,1,1\n"
+        ),
+    )
+    result = service.operator_summary(service.test_id)
+    assert result["total_rows"] == 1 and result["rows"][0]["NVTX Range"] == "aten::mm"
+    assert result["official_report"] == "nvtx_kern_sum"
+    assert result["association"] == "recorded_nvtx_launch_containment"
+    assert any("Nested" in note for note in result["semantics"])
 
 
 def test_runtime_missing_command_is_diagnostic():

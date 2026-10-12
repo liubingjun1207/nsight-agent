@@ -24,6 +24,12 @@ TOOLS = {
     "nsight_nvtx_trace",
     "nsight_compare",
     "nsight_export_analysis",
+    "nsight_capture_targets",
+    "nsight_capture",
+    "nsight_operator_summary",
+    "nsight_compute_doctor",
+    "nsight_compute_open_report",
+    "nsight_compute_metrics",
 }
 
 

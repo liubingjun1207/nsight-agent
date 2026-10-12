@@ -46,6 +46,12 @@ def render_config(
         f"NSIGHT_NSYS_PATH = {json.dumps(nsys, ensure_ascii=False)}\n"
         'NSIGHT_TIMEOUT_SECONDS = "120"\nPYTHONIOENCODING = "utf-8"\n'
     )
+    # Optional local features must survive upgrades and be visible to the STDIO child.
+    old_env = before.get("mcp_servers", {}).get("nsight", {}).get("env", {})
+    for key in ("NSIGHT_CAPTURE_CONFIG", "NSIGHT_NCU_PATH", "NSIGHT_CACHE_DIR"):
+        value = os.environ.get(key) or old_env.get(key)
+        if value is not None:
+            block += f"{key} = {json.dumps(str(value), ensure_ascii=False)}\n"
     result = "".join(kept).rstrip() + "\n" + block
     try:
         after = tomllib.loads(result)
@@ -66,7 +72,8 @@ def render_config(
 
 def configure_codex(*, required=False, tool_timeout=300) -> dict:
     nsys = str(discover_nsys().resolve())
-    python = str(Path(sys.executable).resolve())
+    # Resolving a Linux venv symlink selects the base interpreter and loses its packages.
+    python = str(Path(sys.executable).absolute())
     home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
     path = home / "config.toml"
     original = path.read_text(encoding="utf-8") if path.exists() else ""
@@ -97,7 +104,7 @@ def configure_codex(*, required=False, tool_timeout=300) -> dict:
         "startup_timeout_sec": 30,
         "tool_timeout_sec": tool_timeout,
         "required": required,
-        "next_step": "Restart/reconnect Codex MCP; call nsight_capabilities and verify twelve tools.",
+        "next_step": "Restart/reconnect Codex MCP; call nsight_capabilities and verify eighteen tools.",
     }
 
 

@@ -1,0 +1,32 @@
+{
+  "date_utc": "2026-10-12T12:10:20.193414+00:00",
+  "model": "gpt-6.1-sol",
+  "python": "3.13.5",
+  "codex_version": "codex-cli 0.162.0-alpha.17.2",
+  "results": [
+    {
+      "passed": true,
+      "errors": [],
+      "tool_calls": 13,
+      "tools": [
+        "nsight_capabilities",
+        "nsight_capture",
+        "nsight_capture_targets",
+        "nsight_compute_doctor",
+        "nsight_compute_metrics",
+        "nsight_compute_open_report",
+        "nsight_export_analysis",
+        "nsight_kernel_summary",
+        "nsight_operator_summary"
+      ],
+      "reports": [
+        "cuda_gpu_kern_sum",
+        "nvtx_kern_sum"
+      ],
+      "case": "extensions",
+      "repetition": 1,
+      "exit_code": 0
+    }
+  ],
+  "note": "Actual tool evidence, not a guarantee for all prompts. Final interpretation requires review of local answers. Raw logs and authentication are not included in this summary."
+}

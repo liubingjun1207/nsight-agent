@@ -9,7 +9,7 @@ nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none \
   --output=sample-linux python profile_workload.py
 ```
 
-Copy `sample-linux.nsys-rep` to Windows and give its absolute path to `nsight_open_report`. Prefer matching collection/analysis versions. A newer capture may require upgrading the Windows Nsight installation.
+Give the report's absolute path to `nsight_open_report` on the same Linux MCP host, or copy it to Windows for analysis. Prefer matching collection/analysis versions. A newer capture may require upgrading the reader. v1.1 can also collect an owner-registered local task; see [the extension guide](../docs/EXTENSIONS.md).
 
 Try `query={"nvtx":"step/0"}` and compare with the whole-report kernel summary. The whole report includes initialization/warmup. `cpu_wait` is an intentional CPU delay; this example does not claim to diagnose real application stalls.
 
@@ -38,3 +38,9 @@ nsys profile --trace=cuda,nvtx --sample=none --cpuctxsw=none \
 ```
 
 For the optional test, set `NSIGHT_STARTEND_REPORT` to the captured report's absolute path alongside `NSIGHT_INTEGRATION=1`. The test expects three `AsyncStep` instances. Our local positive validation was collected on Windows; it is not presented as a Linux capture. The public NVIDIA Linux baseline exercises the missing-data path for Start/End instead.
+
+## v1.1 eager operators and a dependency-light CUDA example
+
+`operator_workload.py` records `aten::` eager operation labels with `emit_nvtx(record_shapes=True)` over three matrix/ReLU/reduction/backward steps. Capture it using the same CUDA/NVTX flags or register it as a local capture target. Query `nsight_operator_summary`; nested labels can associate a kernel repeatedly and do not establish unique operator totals. No compiled/fused graph attribution is claimed.
+
+`driver_workload.py` needs only Python, an NVIDIA GPU and the CUDA driver. It launches a small `fill_int` PTX kernel exactly 20 times and verifies checksum 523776. It has no NVTX operator labels and cannot validate framework attribution. It is useful for Linux containers without a PyTorch installation.

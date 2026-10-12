@@ -67,3 +67,36 @@ def test_failed_status_not_masked_by_null_error():
     events += [{"type": "turn.completed"}, call("nsight_open_report", status="failed", error=None)]
     result = evaluation.inspect_events(events, "launch")
     assert not result["passed"] and "Unexpected failed tool call." in result["errors"]
+
+
+def test_extensions_reject_preexisting_operator_evidence(tmp_path):
+    exported = tmp_path / "evidence.json"
+    exported.write_text("{}")
+    events = [call(tool) for tool in evaluation.CASES["extensions"]["tools"]]
+    events += [
+        call("nsight_capture", {"status": "captured", "report_id": "new"}),
+        call("nsight_kernel_summary", {"official_report": "cuda_gpu_kern_sum"}),
+        call(
+            "nsight_operator_summary",
+            {
+                "official_report": "nvtx_kern_sum",
+                "association": "recorded_nvtx_launch_containment",
+                "report_id": "old",
+                "rows": [{}],
+            },
+        ),
+        call("nsight_export_analysis", {"format": "json", "path": str(exported)}),
+        {"type": "turn.completed"},
+    ]
+    events += [
+        call(
+            "nsight_compute_metrics",
+            {"engine": "nsight_compute", "metric_group": group, "rows": [{"Metric Unit": "%"}]},
+        )
+        for group in ("occupancy", "throughput", "memory", "stalls", "launch")
+    ]
+    result = evaluation.inspect_events(events, "extensions")
+    assert (
+        not result["passed"]
+        and "No recorded operator evidence from the newly captured task." in result["errors"]
+    )

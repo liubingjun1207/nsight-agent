@@ -10,4 +10,5 @@ dist/
 *.nsys-rep
 *.sqlite
 *.sqlite-*
+*.ncu-rep
 !examples/reports/*.nsys-rep

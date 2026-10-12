@@ -94,9 +94,9 @@ codex mcp get nsight
 
 再在 Codex 中发送：
 
-> 使用 nsight_doctor 检查本机 Nsight，列出你当前能调用的十二个 nsight 工具。
+> 使用 nsight_doctor 检查本机 Nsight，列出你当前能调用的十八个 nsight 工具。
 
-应看到这十二个工具：`nsight_doctor`、`nsight_open_report`、`nsight_capabilities`、`nsight_stats`、`nsight_kernel_summary`、`nsight_kernel_trace`、`nsight_cuda_api_summary`、`nsight_memory_summary`、`nsight_nvtx_summary`、`nsight_nvtx_trace`、`nsight_compare`、`nsight_export_analysis`。若工具不存在，请参照第 8 节，而不是让模型用自行生成的 SQL 替代。
+应看到十八个工具：原有的 `nsight_doctor`、`nsight_open_report`、`nsight_capabilities`、`nsight_stats`、`nsight_kernel_summary`、`nsight_kernel_trace`、`nsight_cuda_api_summary`、`nsight_memory_summary`、`nsight_nvtx_summary`、`nsight_nvtx_trace`、`nsight_compare`、`nsight_export_analysis`，以及下表列出的六个扩展工具。若工具不存在，请参照第 8 节，而不是让模型用自行生成的 SQL 替代。
 
 ## 5. 跑通第一次分析
 
@@ -122,7 +122,7 @@ codex mcp get nsight
 
 该范围内第一名累计耗时仍为 1,266,481,454 ns，占比为 25.6%，原因是统计范围改变了分母。更多预期输出见 [完整演示](DEMO.md)。
 
-## 6. 十二个工具怎么问
+## 6. 十八个工具怎么问
 
 | 工具 | 可直接复制的提问 |
 | --- | --- |
@@ -138,6 +138,14 @@ codex mcp get nsight
 | `nsight_nvtx_trace` | “查看 Train 的单次 Push/Pop 范围，返回可查询窗口。” |
 | `nsight_compare` | “按两份报告各自的 Train 范围，对比 kernel/API/内存。” |
 | `nsight_export_analysis` | “把所选结果页面导出为 Markdown 和 JSON。” |
+| `nsight_capture_targets` | “列出用户已登记的本地采集任务与时长。” |
+| `nsight_capture` | “运行已登记的 operator-example，分析生成的报告。” |
+| `nsight_operator_summary` | “查看报告中 aten::mm 标注与 GPU kernel 的关联。” |
+| `nsight_compute_doctor` | “检查可选 Compute 阅读器和指标组。” |
+| `nsight_compute_open_report` | “打开这个本地 .ncu-rep 报告。” |
+| `nsight_compute_metrics` | “查询 occupancy 和吞吐，列出没有采集的指标。” |
+
+采集需要用户预先登记任务；Compute 需要独立 `.ncu-rep`；算子关联需要采集时记录 NVTX 标注。[扩展配置与边界](EXTENSIONS.zh-CN.md)。
 
 限定区间的提问：
 
@@ -227,7 +235,7 @@ doctor 的 `cache_dir` 显示实际缓存路径。默认在 Windows 本地应用
 
 ## 10. 自行采集与后续阅读
 
-自己的 Linux GPU 环境可使用 [示例采集说明](../examples/README.md) 生成报告，传回 Windows 后按相同步骤打开。服务不会自行登录服务器或启动你的训练任务。
+自己的 Linux GPU 环境可使用 [示例采集说明](../examples/README.md) 手动生成报告，也可按 [v1.1 扩展指南](EXTENSIONS.zh-CN.md) 在同一 Linux 主机登记并调用受控采集任务。Windows 仍可分析传回的报告。服务不会自行登录服务器或调度集群任务。
 
 - [完整接口与参数](../README.md#tools)
 - [逐步演示及统计预期](DEMO.md)

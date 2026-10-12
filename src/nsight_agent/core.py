@@ -21,7 +21,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .analysis import AnalysisMixin
+from .capture import CaptureMixin
 from .catalog import CATALOG, CatalogMixin, ReportOptions
+from .compute import ComputeMixin
 
 REPORTS = {
     "kernel_summary": "cuda_gpu_kern_sum",
@@ -285,7 +287,7 @@ def run_process(
     return subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
 
 
-class NsightService(AnalysisMixin, CatalogMixin):
+class NsightService(AnalysisMixin, CatalogMixin, CaptureMixin, ComputeMixin):
     def __init__(
         self, nsys: str | None = None, cache_dir: str | Path | None = None, timeout: float = 120
     ):
@@ -299,6 +301,8 @@ class NsightService(AnalysisMixin, CatalogMixin):
         self._session_cache: Path | None = None
         self._results: dict[str, dict] = {}
         self._warnings: list[dict] = []
+        self._compute_reports: dict[str, Report] = {}
+        self._compute_capabilities: dict | None = None
 
     @contextmanager
     def _cache_io(self):
@@ -626,3 +630,18 @@ class NsightService(AnalysisMixin, CatalogMixin):
         if metric not in ("time", "size"):
             raise NsightError("metric must be 'time' or 'size'.")
         return self.query(report_id, f"memory_{metric}", query)
+
+    def operator_summary(self, report_id: str, query: Query | None = None):
+        with self._lock:
+            result = self._query_result(
+                report_id, "nvtx_kern_sum", query or Query(name_contains="aten::")
+            )
+            result["association"] = "recorded_nvtx_launch_containment"
+            result["semantics"] += [
+                "Operator labels must have been recorded as NVTX ranges during collection; "
+                "kernel names alone do not establish aten operator identity.",
+                "This is a range/kernel association table, not summed unique operator GPU time. "
+                "Nested operator ranges may associate the same kernel repeatedly.",
+                "Validated scope is annotated PyTorch eager execution; no compiled/fused graph attribution.",
+            ]
+            return self._remember(result)

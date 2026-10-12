@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0 — unreleased
+
+- Add an owner-configured local Systems capture registry, bounded collection and report registration; no command/argument input through tool calls.
+- Add a Linux source installer and actual Linux container reader/collection validation.
+- Preserve the virtual-environment interpreter path during setup instead of resolving Linux symlinks to a base Python.
+- Add recorded PyTorch eager NVTX/kernel association with explicit nesting and fusion limits.
+- Add optional Compute report imports through five fixed metric groups, exact units, missing metrics and existing evidence exports.
+- Expose eighteen MCP tools; retain all existing Systems reports and interfaces.
+- Include the v1.0 configuration/cache/diagnostic fixes and extend usage, skill and scope documentation.
+
 ## 1.0.0 — 2026-10-12
 
 - Close the fixed 18-report CUDA/NVTX scope through capability discovery and an allowlisted unified statistics tool; retain all v0.2 APIs.

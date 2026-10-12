@@ -28,7 +28,7 @@
 | core | Top kernel、执行明细、范围发现、十秒边界、grid/block、API 汇总/明细、内存时间/字节/明细 |
 | launch | 发射/排队/执行、NVTX GPU 投影、launch-based 范围归属、CPU/GPU 分类 |
 | compare | 两侧各自的 Train 范围、四类对比、实际 Markdown/JSON 文件 |
-| diagnostics | 无效报告、Start/End 缺少数据、无匹配名称及范围外的 Nsight Compute 问题 |
+| diagnostics | 无效报告、Start/End 缺少数据、无匹配名称，以及 Systems 报告不能补算 Compute 指标的限制 |
 
 使用 `--case core --repetitions 2` 复查代表性流程。脚本要求观察到实际 MCP 调用和相应结果，核对关键数值及独立范围；若使用 shell、网页或其他 MCP 代替分析，就判为失败。不能只根据模型回答“成功”就通过。
 

@@ -122,3 +122,38 @@ def test_install_skill_preserves_custom_edits(tmp_path, monkeypatch):
     path.write_text("user-customized skill", encoding="utf-8")
     assert install_analysis_skill()["status"] == "preserved_custom"
     assert path.read_text() == "user-customized skill"
+
+
+def test_setup_preserves_optional_feature_environment(monkeypatch):
+    monkeypatch.delenv("NSIGHT_NCU_PATH", raising=False)
+    monkeypatch.delenv("NSIGHT_CACHE_DIR", raising=False)
+    monkeypatch.setenv("NSIGHT_CAPTURE_CONFIG", "C:/targets.toml")
+    original = (
+        '[mcp_servers.nsight.env]\nNSIGHT_NCU_PATH="/opt/ncu"\nNSIGHT_CACHE_DIR="/data/cache"\n'
+    )
+    config = tomllib.loads(render_config(original, "python", "nsys"))
+    env = config["mcp_servers"]["nsight"]["env"]
+    assert env["NSIGHT_CAPTURE_CONFIG"] == "C:/targets.toml"
+    assert env["NSIGHT_NCU_PATH"] == "/opt/ncu" and env["NSIGHT_CACHE_DIR"] == "/data/cache"
+
+
+def test_configure_does_not_resolve_venv_interpreter(tmp_path, monkeypatch):
+    interpreter = tmp_path / "venv" / "bin" / "python"
+    nsys = tmp_path / "nsys"
+    nsys.touch()
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    monkeypatch.setattr(sys, "executable", str(interpreter))
+    monkeypatch.setattr("nsight_agent.configure.discover_nsys", lambda: nsys)
+    path_type = type(tmp_path)
+    original_resolve = path_type.resolve
+
+    def resolve(path, *args, **kwargs):
+        if path == interpreter:
+            pytest.fail("Resolving the interpreter can escape a Linux virtual environment")
+        return original_resolve(path, *args, **kwargs)
+
+    monkeypatch.setattr(path_type, "resolve", resolve)
+    result = configure_codex()
+    assert result["python"] == str(interpreter)
+    config = tomllib.loads((tmp_path / "config.toml").read_text(encoding="utf-8"))
+    assert config["mcp_servers"]["nsight"]["command"] == str(interpreter)
