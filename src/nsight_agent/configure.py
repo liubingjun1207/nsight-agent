@@ -104,7 +104,7 @@ def configure_codex(*, required=False, tool_timeout=300) -> dict:
         "startup_timeout_sec": 30,
         "tool_timeout_sec": tool_timeout,
         "required": required,
-        "next_step": "Restart/reconnect Codex MCP; call nsight_capabilities and verify eighteen tools.",
+        "next_step": "Restart/reconnect Codex MCP; verify twenty tools with nsight_capabilities and nsight_analysis_rules.",
     }
 
 

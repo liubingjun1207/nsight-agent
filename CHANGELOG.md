@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0.dev1 — unreleased
+
+- Honor configured local env_vars and cwd in real connection checks, with explicit env overrides and clear rejection of unsupported remote configuration.
+- Require both start and end boundaries, without an NVTX override, in first-second and first-ten-second model acceptance checks.
+
+- Add fixed official Systems diagnostic rule discovery and a unified analyze tool; twenty tools total.
+- Support six CUDA/GPU rules with exclusive time/NVTX scope, API-name filtering, sorting, complete findings before pagination and evidence exports.
+- Validate installed rule parameters; bound gap/threshold/chunk inputs and retain official timing/utilization semantics.
+- Preserve missing-data SKIPPED diagnostics that analyze --quiet hides in Systems 2025.6.3; reject unsupported schemas instead of claiming no findings.
+- Add bilingual diagnostic guides, analysis skill routing, GPU-free contracts, direct CLI/STDIO integration and a real Codex evaluation case.
+- Reuse the isolated report-copy/export cache and keep all existing tools compatible.
+
 ## 1.1.0 — 2026-10-13
 
 - Add an owner-configured local Systems capture registry, bounded collection and report registration; no command/argument input through tool calls.

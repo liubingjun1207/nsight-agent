@@ -12,6 +12,8 @@ from mcp.client.stdio import stdio_client
 from .core import NsightError
 
 TOOLS = {
+    "nsight_analysis_rules",
+    "nsight_analyze",
     "nsight_doctor",
     "nsight_open_report",
     "nsight_capabilities",
@@ -33,8 +35,8 @@ TOOLS = {
 }
 
 
-async def probe(command, args, env=None, *, timeout=60, report=None):
-    params = StdioServerParameters(command=command, args=args, env=env)
+async def probe(command, args, env=None, *, cwd=None, timeout=60, report=None):
+    params = StdioServerParameters(command=command, args=args, env=env, cwd=cwd)
     async with asyncio.timeout(timeout):
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
@@ -85,13 +87,14 @@ async def probe(command, args, env=None, *, timeout=60, report=None):
                 return result
 
 
-def run_probe(command=sys.executable, args=None, env=None, *, timeout=60, report=None):
+def run_probe(command=sys.executable, args=None, env=None, *, cwd=None, timeout=60, report=None):
     try:
         return asyncio.run(
             probe(
                 command,
                 args if args is not None else ["-m", "nsight_agent"],
                 env,
+                cwd=cwd,
                 timeout=timeout,
                 report=report,
             )
@@ -118,6 +121,46 @@ def run_probe(command=sys.executable, args=None, env=None, *, timeout=60, report
         }
 
 
+def configured_environment(server):
+    """Forward whitelisted local variables, then apply explicit per-server overrides."""
+    if server.get("experimental_environment", "local") != "local":
+        raise NsightError(
+            "This local connection check cannot validate a remote MCP executor.",
+            code="MCP_CONFIG_INVALID",
+        )
+    names = server.get("env_vars", [])
+    explicit = server.get("env", {})
+    if (
+        not isinstance(names, list)
+        or not isinstance(explicit, dict)
+        or not all(isinstance(k, str) and isinstance(v, str) for k, v in explicit.items())
+    ):
+        raise NsightError(
+            "env_vars must be an array and env must map strings to strings.",
+            code="MCP_CONFIG_INVALID",
+        )
+    env = {}
+    for entry in names:
+        if isinstance(entry, dict) and set(entry) <= {"name", "source"}:
+            if entry.get("source", "local") != "local":
+                raise NsightError(
+                    "This local check cannot resolve remote env_vars sources.",
+                    code="MCP_CONFIG_INVALID",
+                )
+            name = entry.get("name")
+        else:
+            name = entry
+        if not isinstance(name, str) or not name:
+            raise NsightError(
+                "Each env_vars entry must name a local environment variable.",
+                code="MCP_CONFIG_INVALID",
+            )
+        if name in os.environ:
+            env[name] = os.environ[name]
+    env.update(explicit)
+    return env
+
+
 def check_connection(*, report=None, config_path=None):
     path = (
         Path(config_path)
@@ -142,7 +185,8 @@ def check_connection(*, report=None, config_path=None):
         result = run_probe(
             command,
             server.get("args", []),
-            server.get("env"),
+            configured_environment(server),
+            cwd=server.get("cwd"),
             timeout=float(server.get("tool_timeout_sec", 300)),
             report=report,
         )

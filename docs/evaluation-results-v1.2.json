@@ -1,0 +1,40 @@
+{
+  "date_utc": "2026-10-13T04:26:55.049607+00:00",
+  "model": "gpt-6.1-sol",
+  "python": "3.13.5",
+  "codex_version": "codex-cli 0.162.0-alpha.17.2",
+  "results": [
+    {
+      "passed": true,
+      "errors": [],
+      "tool_calls": 14,
+      "tools": [
+        "nsight_analysis_rules",
+        "nsight_analyze",
+        "nsight_capabilities",
+        "nsight_export_analysis",
+        "nsight_nvtx_summary",
+        "nsight_open_report",
+        "nsight_stats"
+      ],
+      "reports": [
+        "cuda_api_trace",
+        "nvtx_sum"
+      ],
+      "case": "bottlenecks",
+      "repetition": 1,
+      "exit_code": 0
+    }
+  ],
+  "note": "Actual tool evidence, not a guarantee for all prompts. Final interpretation requires review of local answers. Raw logs and authentication are not included in this summary.",
+  "extension": "six fixed official Nsight Systems diagnostic rules",
+  "artifact_version": "1.2.0.dev1",
+  "review": {
+    "numeric_and_units": "matched exported official evidence",
+    "scopes": "full report, Train NVTX and first second",
+    "followup": "actual GPU gap time_query reused for CPU API trace",
+    "export": "eight diagnostic snapshots and one trace",
+    "interpretation": "candidate causes, no-findings and time/resource utilization distinguished",
+    "limitations": "one model run on one public capture; not universal question coverage"
+  }
+}

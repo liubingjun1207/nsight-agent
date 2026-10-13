@@ -1,5 +1,7 @@
 # Nsight Agent v1.1 中文入门指南
 
+当前源码另有 1.2.0.dev1 的六条官方瓶颈诊断扩展，合计二十个工具；开发版本安装与新工具流程见 [诊断指南](DIAGNOSTICS.zh-CN.md)。下文的 v1.1.0 下载及十八个工具说明对应已发布版本。
+
 这份指南适用于在 Windows 上，通过 Codex 分析现成的 Nsight Systems 报告。完成后，你可以直接问：“列出最耗时的十个 CUDA kernel”，由 Codex 调用工具得到可复核的统计。
 
 本指南对应 [v1.1.0 正式发布](https://github.com/liubingjun1207/nsight-agent/releases/tag/v1.1.0)，包含十八个工具。Linux 安装、本地采集、PyTorch eager 标注与可选 Compute 报告见 [扩展指南](EXTENSIONS.zh-CN.md)。v1.0.0 只有十二个工具，不能用于验证本指南的六个扩展工具。

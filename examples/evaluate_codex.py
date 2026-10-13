@@ -16,6 +16,18 @@ from pathlib import Path
 from nsight_agent.core import discover_nsys, run_process
 
 CASES = {
+    "bottlenecks": {
+        "question": "分析 baseline 为什么可能慢：先发现六条官方诊断规则与 NVTX 范围，分别运行六条规则，每次最多两行。GPU gaps 的主查询设置 gap_ms=1。再分别查询 Train NVTX 范围的 GPU time utilization，以及报告前一秒的同步调用。沿一条 GPU gap 返回的 time_query 查询 CPU CUDA API trace，最多两行，以核查候选原因。导出这八份诊断和一份 trace 的 JSON 证据，返回路径。说明每个规则的完整命中数量、阈值和单位；区别 no_findings、缺失数据、时间利用率与 SM 利用率，不根据规则命中直接断言根因或整体加速。",
+        "tools": {
+            "nsight_analysis_rules",
+            "nsight_analyze",
+            "nsight_open_report",
+            "nsight_nvtx_summary",
+            "nsight_stats",
+            "nsight_export_analysis",
+        },
+        "reports": {"cuda_api_trace"},
+    },
     "core": {
         "question": "分析 baseline 报告：列出累计耗时最高的十个 CUDA kernel；查看第一名最早的两次执行；发现 NVTX 范围并查看 Train 的一次明细；再查报告前十秒的 kernel 汇总。另查 kernel 的 grid/block 分组、CPU 同步 API 汇总与两次明细、内存操作耗时与字节数，以及两条 GPU memcpy 执行明细。每项最多十行，说明各自时间含义。",
         "tools": {
@@ -141,7 +153,9 @@ def inspect_events(events, case):
             errors.append("Whole-report top-kernel evidence missing or incorrect.")
         if not any(
             r.get("official_report") == "cuda_gpu_kern_sum"
+            and r["filters"].get("start_ns") == 0
             and r["filters"].get("end_ns") == 10000000000
+            and not r["filters"].get("nvtx")
             for r in records
         ):
             errors.append("Did not apply the requested ten-second boundary.")
@@ -188,6 +202,69 @@ def inspect_events(events, case):
                     or (item.get("tool") == "nsight_stats" and "MISSING_DATA" in text)
                 ):
                     errors.append("Unexpected diagnostic failure.")
+    if case == "bottlenecks":
+        diagnoses = [r for r in records if r.get("official_rule")]
+        expected = {
+            "cuda_api_sync": 1928,
+            "cuda_memcpy_async": 1926,
+            "cuda_memcpy_sync": 0,
+            "cuda_memset_sync": 0,
+            "gpu_gaps": 954,
+            "gpu_time_util": 1,
+        }
+        whole = {
+            r["official_rule"]: r
+            for r in diagnoses
+            if not r.get("filters", {}).get("nvtx")
+            and r.get("filters", {}).get("start_ns") is None
+            and r.get("filters", {}).get("end_ns") is None
+        }
+        if set(whole) != set(expected) or any(
+            whole.get(rule, {}).get("total_rows") != count for rule, count in expected.items()
+        ):
+            errors.append("Six untruncated official rule results absent or incorrect.")
+        if whole.get("gpu_gaps", {}).get("rule_parameters", {}).get("gap") != 1:
+            errors.append("Requested 1ms gap threshold absent.")
+        if not any(
+            r["official_rule"] == "gpu_time_util" and r["filters"].get("nvtx") == "Train"
+            for r in diagnoses
+        ):
+            errors.append("Train NVTX diagnostic absent.")
+        if not any(
+            r["official_rule"] == "cuda_api_sync"
+            and r["filters"].get("start_ns") == 0
+            and r["filters"].get("end_ns") == 1000000000
+            and not r["filters"].get("nvtx")
+            for r in diagnoses
+        ):
+            errors.append("One-second diagnostic scope absent.")
+        windows = [
+            row["time_query"]
+            for row in whole.get("gpu_gaps", {}).get("rows", [])
+            if "time_query" in row
+        ]
+        if not any(
+            r.get("official_report") == "cuda_api_trace"
+            and any(all(r["filters"].get(k) == v for k, v in w.items()) for w in windows)
+            for r in records
+        ):
+            errors.append("No API trace followed an actual gap window.")
+        exports = [r for r in records if r.get("format") == "json"]
+        if not exports or not all(Path(r["path"]).is_file() for r in exports):
+            errors.append("No actual diagnostic JSON evidence export.")
+        else:
+            exported_ids = {
+                r.get("result_id")
+                for export in exports
+                for r in json.loads(Path(export["path"]).read_text(encoding="utf-8"))["results"]
+            }
+            required_ids = {
+                r.get("result_id")
+                for r in records
+                if r.get("official_rule") or r.get("official_report") == "cuda_api_trace"
+            }
+            if None in required_ids or not required_ids.issubset(exported_ids):
+                errors.append("Diagnostic/trace snapshots were omitted from the actual export.")
     if case == "extensions":
         captured = {r.get("report_id") for r in records if r.get("status") == "captured"}
         associated = [

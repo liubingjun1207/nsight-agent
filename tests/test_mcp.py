@@ -16,6 +16,8 @@ def test_stdio_contract():
                 result = await session.list_tools()
                 assert all(t.outputSchema is not None for t in result.tools)
                 assert {t.name for t in result.tools} == {
+                    "nsight_analysis_rules",
+                    "nsight_analyze",
                     "nsight_doctor",
                     "nsight_open_report",
                     "nsight_capabilities",

@@ -4,6 +4,8 @@
 
 New users: follow the [step-by-step Chinese onboarding guide](docs/GETTING_STARTED.zh-CN.md), including connection checks, prompts for every tool, troubleshooting, updates and removal.
 
+This checkout is **1.2.0.dev1** with twenty tools. It adds six official `nsys analyze` rules through `nsight_analysis_rules` and `nsight_analyze`; see the [diagnostic workflow](docs/DIAGNOSTICS.md). The published v1.1.0 downloads below contain eighteen tools and do not include this development extension.
+
 Download [v1.1.0](https://github.com/liubingjun1207/nsight-agent/releases/tag/v1.1.0): [full source with installers, examples and guides](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/nsight_agent-1.1.0.tar.gz), [wheel](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/nsight_agent-1.1.0-py3-none-any.whl), and [SHA256SUMS](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/SHA256SUMS). Use v1.1.0 for all eighteen tools; v1.0.0 has twelve.
 
 The [project scope](docs/PROJECT_SCOPE.zh-CN.md) retains 18 official CUDA/NVTX reports and defines the finite v1.1 extension. The [three acceptance layers](docs/ACCEPTANCE.zh-CN.md) cover numeric correctness, real model usage and installation from artifacts.
@@ -11,7 +13,7 @@ The [project scope](docs/PROJECT_SCOPE.zh-CN.md) retains 18 official CUDA/NVTX r
 Ask Codex about CUDA kernel timing. This local MCP server calls **NVIDIA Nsight Systems**, returns structured official statistics, and lets Codex explain the evidence or drill down. It does not send raw profiling databases to the model or implement a second profiling engine.
 
 ```text
-Your question → Codex → MCP tools → nsys stats → structured results → Codex
+Your question → Codex → MCP tools → nsys stats / analyze → structured results → Codex
 ```
 
 v1.1 adds Windows/Linux local Systems collection, recorded PyTorch eager NVTX associations and optional Compute report metrics. See [the extension guide](docs/EXTENSIONS.md) and [actual platform validation](docs/VALIDATION-v1.1.md). GUI automation, remote management, Compute collection and compiled/fused graph attribution remain excluded. No separate model API key is required by this server.
@@ -76,6 +78,8 @@ The wheel includes the analysis skill; `--setup` installs it into `~/.codex/skil
 | `nsight_compute_doctor` | Optional Compute installation and fixed metric catalog |
 | `nsight_compute_open_report` | Register a separate `.ncu-rep` |
 | `nsight_compute_metrics` | Occupancy/throughput/memory/stalls/launch metrics, units and missing data |
+| `nsight_analysis_rules` | Discover six approved official diagnostic rules, installed support and defaults |
+| `nsight_analyze` | Synchronization/copy patterns, GPU gaps and low time utilization; scoped, paginated and exportable |
 
 Systems analyses accept `report_id` and an optional `query` object. Capture and Compute parameters are described in [the extension guide](docs/EXTENSIONS.md):
 

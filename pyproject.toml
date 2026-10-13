@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nsight-agent"
-version = "1.1.0"
+version = "1.2.0.dev1"
 description = "Local Nsight collection, Systems analysis and optional Compute metrics over MCP"
 readme = "README.md"
 requires-python = ">=3.11"

@@ -24,6 +24,7 @@ from .analysis import AnalysisMixin
 from .capture import CaptureMixin
 from .catalog import CATALOG, CatalogMixin, ReportOptions
 from .compute import ComputeMixin
+from .diagnostics import RULES, DiagnosticsMixin
 
 REPORTS = {
     "kernel_summary": "cuda_gpu_kern_sum",
@@ -171,11 +172,14 @@ def discover_nsys(explicit: str | None = None) -> Path:
     raise NsightError("Nsight Systems CLI not found. Set NSIGHT_NSYS_PATH to nsys.exe.")
 
 
-def parse_csv(text: str, required: set[str] | None = None) -> tuple[list[str], list[dict]]:
+def parse_csv(
+    text: str, required: set[str] | None = None, *, name_columns: tuple[str, ...] | None = None
+) -> tuple[list[str], list[dict]]:
     """Keep NVIDIA's column labels/units; preserve integer timestamp precision."""
     reader = csv.DictReader(io.StringIO(text.lstrip("\ufeff")))
     columns = reader.fieldnames or []
-    if not columns or not any(c in columns for c in ("Name", "Operation", "Kernel Name", "Range")):
+    markers = name_columns or ("Name", "Operation", "Kernel Name", "Range")
+    if not columns or not any(c in columns for c in markers):
         raise NsightError("Nsight returned no valid CSV table; report data may be missing.")
     if required and not required.issubset(columns):
         raise NsightError(f"Unsupported report schema: missing {sorted(required - set(columns))}.")
@@ -195,6 +199,8 @@ def parse_csv(text: str, required: set[str] | None = None) -> tuple[list[str], l
         "RangeStack",
         "Category",
         "API Name",
+        "Src Kind",
+        "Dst Kind",
         "API Function",
         "NVTX Range",
         "GridXYZ",
@@ -287,7 +293,7 @@ def run_process(
     return subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
 
 
-class NsightService(AnalysisMixin, CatalogMixin, CaptureMixin, ComputeMixin):
+class NsightService(AnalysisMixin, CatalogMixin, CaptureMixin, ComputeMixin, DiagnosticsMixin):
     def __init__(
         self, nsys: str | None = None, cache_dir: str | Path | None = None, timeout: float = 120
     ):
@@ -303,6 +309,7 @@ class NsightService(AnalysisMixin, CatalogMixin, CaptureMixin, ComputeMixin):
         self._warnings: list[dict] = []
         self._compute_reports: dict[str, Report] = {}
         self._compute_capabilities: dict | None = None
+        self._analysis_capabilities: dict | None = None
 
     @contextmanager
     def _cache_io(self):
@@ -321,6 +328,7 @@ class NsightService(AnalysisMixin, CatalogMixin, CaptureMixin, ComputeMixin):
         env = os.environ.copy()
         # Nsight searches these paths for executable Python report scripts.
         env.pop("NSYS_STATS_REPORT_PATH", None)
+        env.pop("NSYS_ANALYSIS_RULE_PATH", None)
         env.pop("PYTHONPATH", None)
         env["PYTHONIOENCODING"] = "utf-8"
         try:
@@ -338,11 +346,17 @@ class NsightService(AnalysisMixin, CatalogMixin, CaptureMixin, ComputeMixin):
             raise NsightError(f"Cannot execute Nsight: {exc}") from exc
         # Nsight 2025.6 returns exit 1 for this successful discovery command.
         help_reports_success = (
-            args == ["stats", "--help-reports"]
+            args in (["stats", "--help-reports"], ["analyze", "--help-rules"])
             and result.returncode == 1
             and "The following built-in reports are available:" in result.stdout
         )
-        if result.returncode and not help_reports_success:
+        help_rule_success = (
+            len(args) == 3 and args[:2] == ["analyze", "--help-rules"]
+            and args[2] in RULES and result.returncode == 1
+            and result.stdout.lstrip().startswith(args[2] + "[")
+            and "Options:" in result.stdout
+        )
+        if result.returncode and not (help_reports_success or help_rule_success):
             detail = (result.stderr or result.stdout).strip()[-3000:]
             raise NsightError(f"Nsight failed (exit {result.returncode}): {detail}")
         # Some Nsight reports skip missing data without failing the process.
@@ -424,39 +438,8 @@ class NsightService(AnalysisMixin, CatalogMixin, CaptureMixin, ComputeMixin):
         if (stat.st_size, stat.st_mtime_ns) != (report.size, report.mtime_ns):
             raise NsightError("Report changed since registration; reopen it before querying.")
 
-    def _table(
-        self, report_id: str, report_name: str, query: Query, options: ReportOptions | None = None
-    ):
-        if report_name not in CATALOG:
-            raise NsightError("Report outside the fixed CUDA/NVTX allowlist.", code="OUT_OF_SCOPE")
-        self._warnings = []
-        capabilities = self._capabilities or self.doctor()
-        if report_name not in capabilities["reports"]:
-            raise NsightError(f"Installed Nsight does not support {report_name}.")
-        required = {"--report", "--format", "--output", "--quiet"}
-        if query.nvtx is not None:
-            required.add("--filter-nvtx")
-        if query.start_ns is not None or query.end_ns is not None:
-            required.add("--filter-time")
-        if not required.issubset(capabilities["options"]):
-            raise NsightError(
-                f"Unsupported Nsight options: {sorted(required - set(capabilities['options']))}"
-            )
-        options = options or ReportOptions()
-        parameters = []
-        if options.annotate_nvtx:
-            parameters.append("nvtx-name")
-        if options.name_format != "demangled":
-            parameters.append(options.name_format)
-        supported = set(capabilities.get("report_parameters", {}).get(report_name, [])) & set(
-            CATALOG[report_name].parameters
-        )
-        if not set(parameters).issubset(supported):
-            raise NsightError(
-                f"Unsupported report parameters for {report_name}: {parameters}.",
-                code="CAPABILITY_UNAVAILABLE",
-            )
-        selector = report_name + "".join(":" + value for value in parameters)
+    def _report_input(self, report_id: str) -> Path:
+        """Copy/export a registered report into the session cache, never open the source in Nsight."""
         report = self.reports.get(report_id)
         if report is None:
             raise NsightError("Unknown report_id; call nsight_open_report first.")
@@ -494,6 +477,42 @@ class NsightService(AnalysisMixin, CatalogMixin, CaptureMixin, ComputeMixin):
                             raise NsightError("Nsight export did not create a SQLite report.")
                         temporary.replace(exported)
                 local = exported
+        return local.resolve()
+
+    def _table(
+        self, report_id: str, report_name: str, query: Query, options: ReportOptions | None = None
+    ):
+        if report_name not in CATALOG:
+            raise NsightError("Report outside the fixed CUDA/NVTX allowlist.", code="OUT_OF_SCOPE")
+        self._warnings = []
+        capabilities = self._capabilities or self.doctor()
+        if report_name not in capabilities["reports"]:
+            raise NsightError(f"Installed Nsight does not support {report_name}.")
+        required = {"--report", "--format", "--output", "--quiet"}
+        if query.nvtx is not None:
+            required.add("--filter-nvtx")
+        if query.start_ns is not None or query.end_ns is not None:
+            required.add("--filter-time")
+        if not required.issubset(capabilities["options"]):
+            raise NsightError(
+                f"Unsupported Nsight options: {sorted(required - set(capabilities['options']))}"
+            )
+        options = options or ReportOptions()
+        parameters = []
+        if options.annotate_nvtx:
+            parameters.append("nvtx-name")
+        if options.name_format != "demangled":
+            parameters.append(options.name_format)
+        supported = set(capabilities.get("report_parameters", {}).get(report_name, [])) & set(
+            CATALOG[report_name].parameters
+        )
+        if not set(parameters).issubset(supported):
+            raise NsightError(
+                f"Unsupported report parameters for {report_name}: {parameters}.",
+                code="CAPABILITY_UNAVAILABLE",
+            )
+        selector = report_name + "".join(":" + value for value in parameters)
+        local = self._report_input(report_id)
         args = [
             "stats",
             "--report",

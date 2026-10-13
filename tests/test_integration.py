@@ -272,7 +272,7 @@ def test_installer_checks_actual_connection(tmp_path, monkeypatch):
     monkeypatch.setenv("CODEX_HOME", str(tmp_path))
     result = setup()
     assert result["status"] == "ready"
-    assert len(result["connection"]["tools"]) == 18
+    assert len(result["connection"]["tools"]) == 20
     assert len(result["connection"]["available_reports"]) == 18
     assert result["skill"]["status"] in ("installed", "unchanged")
     checked = check_connection(report=str(SAMPLE))

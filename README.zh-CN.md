@@ -4,6 +4,8 @@
 
 第一次使用请先阅读 [中文入门指南](docs/GETTING_STARTED.zh-CN.md)：从零安装、验证连接、十八个工具的提问示例、故障排查、更新和卸载。
 
+当前源码为 **1.2.0.dev1**，合计二十个工具，新增 `nsight_analysis_rules` 和 `nsight_analyze`，接入六条官方诊断规则。安装、提问示例、阈值和结果解释见 [官方瓶颈诊断指南](docs/DIAGNOSTICS.zh-CN.md)。下方已发布的 v1.1.0 包仍为十八个工具，不包含本次开发扩展。
+
 下载 [v1.1.0 正式版](https://github.com/liubingjun1207/nsight-agent/releases/tag/v1.1.0)：[完整源码包（含安装脚本、样例和指南）](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/nsight_agent-1.1.0.tar.gz)、[wheel](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/nsight_agent-1.1.0-py3-none-any.whl)、[SHA256SUMS](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/SHA256SUMS)。十八个工具需要 v1.1.0；旧 v1.0.0 只有十二个。
 
 [最终范围](docs/PROJECT_SCOPE.zh-CN.md) 保留 18 个 CUDA/NVTX 官方报告，并明确 v1.1 的有限扩展。[验收要求](docs/ACCEPTANCE.zh-CN.md) 分别检查数值正确性、真实模型流程和安装发布体验。

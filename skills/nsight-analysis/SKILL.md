@@ -1,6 +1,6 @@
 ---
 name: nsight-analysis
-description: Collect configured local Nsight Systems tasks, analyze CUDA/NVTX reports and annotated PyTorch eager operators, or inspect existing Nsight Compute hardware metrics through nsight-agent MCP tools.
+description: Analyze CUDA/NVTX reports and official Nsight bottleneck rules, collect configured local Systems tasks, associate annotated PyTorch eager operators, or read existing Compute metrics through nsight-agent MCP tools.
 ---
 
 # Nsight analysis
@@ -20,6 +20,12 @@ Start kernel investigations with `nsight_kernel_summary`; request a small page. 
 Narrow with `start_ns`/`end_ns` OR `nvtx: "range[@domain][/index]"`. Do not combine them. Range indices are zero-based. Nsight returns overlapping events with their full durations, so selected-range totals can include time outside the boundaries.
 
 Use `nsight_cuda_api_summary` for CPU-side CUDA API calls. Use `nsight_memory_summary` twice (`metric: "time"`, then `"size"`) for memory time and bytes. These include memset as well as copies.
+
+For "why slow", blocking synchronization, pageable copies, GPU gaps or low GPU time utilization, discover `nsight_analysis_rules` then call `nsight_analyze` with a suitable installed rule. Route synchronization to `cuda_api_sync`, pageable async copies to `cuda_memcpy_async`, synchronous copies/sets to `cuda_memcpy_sync`/`cuda_memset_sync`, idle intervals to `gpu_gaps`, and low time utilization to `gpu_time_util`. All scope/name/sort/page controls belong in `query`; only rule thresholds/chunks belong in `options`. Run only the rules relevant to the question unless a complete diagnostic sweep is requested.
+
+Default gap threshold is 500 ms; short training steps may need an explicitly chosen smaller `options.gap_ms` (integer milliseconds). Default low-utilization threshold is 50% with 30 chunks. Report the actual parameters with findings. Nsight's internal 50-row cap is disabled before service pagination; page size does not reduce rule execution cost. `no_findings` means no matches under these filters/parameters, not missing data or proof of optimal performance. Missing data remains an error. If `official_findings` is nonzero but `total_rows` is zero, the API-name filter removed the findings.
+
+Inspect a finding's `time_query` with CPU API, GPU and NVTX traces to test a suspected cause. CPU synchronization duration differs from GPU copy/memset duration. GPU gaps and time utilization cover each process/device's first-to-last recorded operation span; initial/final idle periods are excluded. Time utilization includes memcpy and profiling overhead, adds concurrent operations and can exceed 100%; it is not SM, Tensor Core or bandwidth utilization. Use a separate Compute report for hardware counters. Official patterns are candidate evidence, not established root causes or an automatic optimization recommendation.
 
 Preserve Nsight's numeric results and units. `Time (%)` is a share of the official report's cumulative duration before name filtering/pagination, not wall time or GPU utilization. Overlapping kernels can make cumulative time exceed elapsed time. Framework operators and CUDA kernels are not one-to-one.
 

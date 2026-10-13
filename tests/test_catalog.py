@@ -132,7 +132,7 @@ def test_connection_checker_detects_hidden_or_disabled_tools(tmp_path):
     assert check_connection(config_path=config)["code"] == "MCP_NOT_ENABLED"
     config.write_text('[mcp_servers.nsight]\ncommand="python"\ndisabled_tools=["nsight_stats"]\n')
     assert check_connection(config_path=config)["code"] == "TOOLS_DISABLED"
-    assert len(TOOLS) == 18
+    assert len(TOOLS) == 20
 
 
 def test_operator_association_requires_recorded_labels(service, monkeypatch):

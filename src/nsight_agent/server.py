@@ -13,6 +13,7 @@ from .catalog import ReportName, ReportOptions
 from .compute import ComputeQuery, MetricGroup
 from .configure import configure_codex, setup
 from .core import NsightError, NsightService, NvtxTraceQuery, Query, StatsQuery
+from .diagnostics import DiagnosticOptions, RuleName
 
 mcp = FastMCP(
     "nsight-agent",
@@ -32,10 +33,42 @@ mcp = FastMCP(
         "For occupancy/throughput/stalls use nsight_compute_doctor, nsight_compute_open_report "
         "and nsight_compute_metrics on a separate .ncu-rep; do not infer hardware counters "
         "from Systems timing or invent operator attribution for unannotated/fused kernels."
+        " For why-slow, synchronization, pageable copies, GPU gaps or low time utilization, "
+        "discover nsight_analysis_rules and use nsight_analyze with an approved rule. "
+        "Investigate returned time_query windows with API/GPU/NVTX traces before claiming causes. "
+        "GPU time utilization is not hardware resource utilization; no findings is not proof of optimal performance."
     ),
 )
 service = NsightService(timeout=float(os.environ.get("NSIGHT_TIMEOUT_SECONDS", "120")))
 annotations = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+
+
+@mcp.tool(annotations=annotations)
+def nsight_analysis_rules() -> dict[str, Any]:
+    """Discover the six approved official analyze rules, installed support, options and defaults.
+    Rule availability does not mean the capture contains required events. Use for why-slow questions.
+    """
+    return service.analysis_rules()
+
+
+@mcp.tool(annotations=annotations)
+def nsight_analyze(
+    report_id: str,
+    rule: RuleName,
+    query: Query | None = None,
+    options: DiagnosticOptions | None = None,
+) -> dict[str, Any]:
+    """Run one official Nsight diagnostic rule. Open a Systems report first.
+    Rules: cuda_api_sync, cuda_memcpy_async, cuda_memcpy_sync, cuda_memset_sync,
+    gpu_gaps, gpu_time_util. query supports exclusive time/NVTX scope, API name filter
+    (CUDA rules only), sorting and offset/limit <=200. Defaults: Duration (ns) descending.
+    options.gap_ms applies only to gpu_gaps (default 500); options.threshold_percent
+    and chunks apply only to gpu_time_util (defaults 50,30). Rule execution requests
+    all findings before pagination. Results include no_findings status, missing-data errors,
+    provenance and reusable time_query windows. Findings require follow-up evidence;
+    In-Use (%) is time utilization, not SM utilization, and can exceed 100% with concurrency.
+    """
+    return service.analyze(report_id, rule, query, options)
 
 
 @mcp.tool(annotations=annotations)
