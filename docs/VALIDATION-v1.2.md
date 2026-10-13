@@ -1,6 +1,6 @@
 # v1.2 diagnostic validation
 
-Development version: 1.2.0.dev1, not a published Release. Validation date: 2026-10-13.
+Release version: 1.2.0. Validation date: 2026-10-13. Functional measurements and model evaluation below were collected with 1.2.0.dev1; the release changes version metadata and documentation, retaining the verified implementation. The final release artifacts are checked separately below.
 
 Windows 11 / Python 3.13.5 / Nsight Systems 2025.6.3 were used to analyze the licensed public Linux/Tesla T4 capture `examples/reports/baseline_nvtx.nsys-rep`. Source report SHA256 remains `760052039bd392c997fdf2533a97292825121dfe818e18f1fd6b127e79ffedea`. No original reports were modified.
 
@@ -43,6 +43,12 @@ Two reproducible review issues were fixed in the same development version. Conne
 The first-second bottleneck evaluation and the first-ten-second core evaluation now require start_ns=0 and the exact requested end_ns, with no NVTX override. New regressions reject a last-one-nanosecond interval, a missing start and a conflicting NVTX scope. The archived 14-call real Codex run was regraded under these stricter checks and still passed; no new model run was claimed.
 
 The expanded Windows GPU-free suite passed 219 tests (18 new regression cases). Actual STDIO regressions prove an env_vars invalid Nsight path fails and a relative launcher in a Chinese cwd receives its forwarded variable. The earlier Linux 201-test/21-integration and Windows 59-integration records above precede this review fix; they are historical validation, not a rerun of the updated suite.
+
+## Final v1.2.0 package checks
+
+The release source and wheel were built with version 1.2.0. A fresh Windows/Python 3.13 environment installed the wheel from its artifact path (not an editable checkout) and passed all 219 GPU-free tests and all 21 real diagnostic integrations against Systems 2025.6.3. An isolated CODEX_HOME setup installed the packaged skill, configured the service and passed an actual twenty-tool connection check plus the public baseline's top kernel (1266481454ns / 938 instances). No source report was modified.
+
+The final release uses the same runtime implementation as the reviewed development build, apart from version metadata. Its updated guides describe twenty tools and link to the v1.2.0 assets. Artifact contents, source protection and checksums are verified before upload. Release CI checks the final commit's source and installed wheel across Windows/Ubuntu and Python 3.11/3.13; the exact GitHub run is visible in the repository Actions history. This record does not claim a new real model run or a rerun of every old optional GPU integration.
 
 Reproduce:
 

@@ -1,10 +1,10 @@
-# 官方瓶颈诊断（1.2.0.dev1）
+# 官方瓶颈诊断（v1.2.0）
 
 本次有限扩展接入六条 Nsight Systems 官方诊断规则，帮助 Codex 找到“为什么可能慢”的证据。它不自动证明根因、改写训练代码或增加任意脚本执行接口。原有十八个工具和十八个统计报告继续兼容，新增两个工具后合计二十个。
 
 ## 安装与连接
 
-当前为开发版本；GitHub 上的 v1.1.0 发布包没有这两个工具。在包含 `pyproject.toml` 的最新源码目录中安装：
+从 [v1.2.0 Release](https://github.com/liubingjun1207/nsight-agent/releases/tag/v1.2.0) 下载完整源码包，解压后在包含 `pyproject.toml` 的目录安装。v1.1.0 包没有这两个诊断工具：
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -e .

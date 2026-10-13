@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.2.0.dev1 — unreleased
+## 1.2.0 — 2026-10-13
 
 - Honor configured local env_vars and cwd in real connection checks, with explicit env overrides and clear rejection of unsupported remote configuration.
 - Require both start and end boundaries, without an NVTX override, in first-second and first-ten-second model acceptance checks.

@@ -1,10 +1,10 @@
-# Nsight Agent v1.1 中文入门指南
+# Nsight Agent v1.2 中文入门指南
 
-当前源码另有 1.2.0.dev1 的六条官方瓶颈诊断扩展，合计二十个工具；开发版本安装与新工具流程见 [诊断指南](DIAGNOSTICS.zh-CN.md)。下文的 v1.1.0 下载及十八个工具说明对应已发布版本。
+v1.2 新增六条官方瓶颈诊断规则及分析流程，合计二十个工具；诊断阈值、筛选与结果解释见 [诊断指南](DIAGNOSTICS.zh-CN.md)。
 
 这份指南适用于在 Windows 上，通过 Codex 分析现成的 Nsight Systems 报告。完成后，你可以直接问：“列出最耗时的十个 CUDA kernel”，由 Codex 调用工具得到可复核的统计。
 
-本指南对应 [v1.1.0 正式发布](https://github.com/liubingjun1207/nsight-agent/releases/tag/v1.1.0)，包含十八个工具。Linux 安装、本地采集、PyTorch eager 标注与可选 Compute 报告见 [扩展指南](EXTENSIONS.zh-CN.md)。v1.0.0 只有十二个工具，不能用于验证本指南的六个扩展工具。
+本指南对应 [v1.2.0 正式发布](https://github.com/liubingjun1207/nsight-agent/releases/tag/v1.2.0)，包含二十个工具。Linux 安装、本地采集、PyTorch eager 标注与可选 Compute 报告见 [扩展指南](EXTENSIONS.zh-CN.md)。v1.1.0 有十八个工具，v1.0.0 有十二个工具；它们均不包含 v1.2 的两个诊断工具。
 
 ## 1. 准备环境
 
@@ -17,11 +17,11 @@
 
 分析已有报告不要求 Windows 本机有 NVIDIA GPU，也不要求安装 PyTorch。自行采集 CUDA 示例需要 NVIDIA GPU；PyTorch 算子示例还需要 CUDA-enabled PyTorch。Compute 是可选组件，阅读 `.ncu-rep` 时才需要安装；验证版本为 2026.1.0。平台和版本覆盖以 [实际验证记录](VALIDATION-v1.1.md) 为准。
 
-## 2. 安装 v1.1.0
+## 2. 安装 v1.2.0
 
-第一次使用建议下载 [完整源码包 nsight_agent-1.1.0.tar.gz](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/nsight_agent-1.1.0.tar.gz)，其中包含安装脚本、公开 Systems 样例和指南。解压后进入包含 `pyproject.toml` 的目录，在资源管理器地址栏输入 `powershell` 打开终端。已有报告的用户也可下载 [wheel](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/nsight_agent-1.1.0-py3-none-any.whl)。
+第一次使用建议下载 [完整源码包 nsight_agent-1.2.0.tar.gz](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.2.0/nsight_agent-1.2.0.tar.gz)，其中包含安装脚本、公开 Systems 样例和指南。解压后进入包含 `pyproject.toml` 的目录，在资源管理器地址栏输入 `powershell` 打开终端。已有报告的用户也可下载 [wheel](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.2.0/nsight_agent-1.2.0-py3-none-any.whl)。
 
-发布页的 [SHA256SUMS](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.1.0/SHA256SUMS) 提供校验值。Windows 可用 `Get-FileHash -Algorithm SHA256 下载文件路径` 核对下载文件；Linux 可用 `sha256sum -c SHA256SUMS`。安装脚本需在解压后的完整项目中运行。
+发布页的 [SHA256SUMS](https://github.com/liubingjun1207/nsight-agent/releases/download/v1.2.0/SHA256SUMS) 提供校验值。Windows 可用 `Get-FileHash -Algorithm SHA256 下载文件路径` 核对下载文件；Linux 可用 `sha256sum -c SHA256SUMS`。安装脚本需在解压后的完整项目中运行。
 
 执行：
 
@@ -34,7 +34,7 @@ python -m venv .venv
 
 无需激活虚拟环境；这里始终明确使用项目的 `.venv` Python。源码包用户也可以直接执行 `powershell -File .\install.ps1`，它会完成虚拟环境创建、安装、接入和样例连接检查。
 
-版本输出应为 `1.1.0`。如果仍是旧版，请先在该 Python 环境安装新的包，再重新执行 setup；不要在另一个 Python 环境中升级。
+版本输出应为 `1.2.0`。如果仍是旧版，请先在该 Python 环境安装新的包，再重新执行 setup；不要在另一个 Python 环境中升级。
 
 成功的检查结果应包含：
 
@@ -58,7 +58,7 @@ $env:NSIGHT_NSYS_PATH = 'C:\Program Files\NVIDIA Corporation\Nsight Systems 2025
 若只想安装 wheel，也可以在同一个虚拟环境执行：
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install --upgrade 'C:\你的下载目录\nsight_agent-1.1.0-py3-none-any.whl'
+.\.venv\Scripts\python.exe -m pip install --upgrade 'C:\你的下载目录\nsight_agent-1.2.0-py3-none-any.whl'
 ```
 
 wheel 不包含公开报告和指南，但包含分析 skill，可由 `--setup` 安装；第一次使用建议下载完整源代码包。
@@ -103,9 +103,9 @@ codex mcp get nsight
 
 再在 Codex 中发送：
 
-> 使用 nsight_doctor 检查本机 Nsight，列出你当前能调用的十八个 nsight 工具。
+> 使用 nsight_doctor 检查本机 Nsight，列出你当前能调用的二十个 nsight 工具。
 
-应看到十八个工具：原有的 `nsight_doctor`、`nsight_open_report`、`nsight_capabilities`、`nsight_stats`、`nsight_kernel_summary`、`nsight_kernel_trace`、`nsight_cuda_api_summary`、`nsight_memory_summary`、`nsight_nvtx_summary`、`nsight_nvtx_trace`、`nsight_compare`、`nsight_export_analysis`，以及下表列出的六个扩展工具。若工具不存在，请参照第 8 节，而不是让模型用自行生成的 SQL 替代。
+应看到二十个工具：原有的 `nsight_doctor`、`nsight_open_report`、`nsight_capabilities`、`nsight_stats`、`nsight_kernel_summary`、`nsight_kernel_trace`、`nsight_cuda_api_summary`、`nsight_memory_summary`、`nsight_nvtx_summary`、`nsight_nvtx_trace`、`nsight_compare`、`nsight_export_analysis`，以及下表列出的六个采集/Compute 扩展工具和两个诊断工具。若工具不存在，请参照第 8 节，而不是让模型用自行生成的 SQL 替代。
 
 ## 5. 跑通第一次分析
 
@@ -131,7 +131,7 @@ codex mcp get nsight
 
 该范围内第一名累计耗时仍为 1,266,481,454 ns，占比为 25.6%，原因是统计范围改变了分母。更多预期输出见 [完整演示](DEMO.md)。
 
-## 6. 十八个工具怎么问
+## 6. 二十个工具怎么问
 
 | 工具 | 可直接复制的提问 |
 | --- | --- |
@@ -153,6 +153,10 @@ codex mcp get nsight
 | `nsight_compute_doctor` | “检查可选 Compute 阅读器和指标组。” |
 | `nsight_compute_open_report` | “打开这个本地 .ncu-rep 报告。” |
 | `nsight_compute_metrics` | “查询 occupancy 和吞吐，列出没有采集的指标。” |
+| `nsight_analysis_rules` | “发现本机支持的六条官方诊断规则和默认阈值。” |
+| `nsight_analyze` | “检查同步调用、可页内存拷贝和 GPU 空隙，空隙阈值设为 1 ms。” |
+
+诊断工具的完整步骤见 [官方瓶颈诊断指南](DIAGNOSTICS.zh-CN.md)。GPU 空隙默认阈值为 500 ms，短训练 step 可明确选择较低阈值；未命中不是缺失数据，时间利用率不是 SM 利用率。
 
 采集需要用户预先登记任务；Compute 需要独立 `.ncu-rep`；算子关联需要采集时记录 NVTX 标注。[扩展配置与边界](EXTENSIONS.zh-CN.md)。
 
@@ -203,7 +207,7 @@ NVTX 参数格式为 `范围名[@域名][/序号]`，序号从 0 开始；时间
 | `Nsight Systems CLI not found` | 指定 `NSIGHT_NSYS_PATH`；确认指向 Systems 的 `nsys.exe`，不是 Nsight Compute 的 `ncu.exe` |
 | `missing_reports` 非空或选项不支持 | 检查 Nsight 版本；升级到已支持所需官方报告的版本，再运行 doctor |
 | Codex 中没有工具 | 检查 MCP 服务启用状态、Python 路径与配置位置；重新连接或重启客户端 |
-| 只有十二个工具，没有采集/Compute 工具 | 检查配置中 Python 的包版本，安装 v1.1.0，再执行 `--setup` 并重新连接；v1.0.0 不包含六个扩展工具 |
+| 缺少采集/Compute 或诊断工具 | 检查配置中 Python 的包版本，安装 v1.2.0，再执行 `--setup` 并重新连接；v1.1.0 不包含两个诊断工具，v1.0.0 不包含采集/Compute 扩展 |
 | 工具启动失败 | 在终端运行相同 Python 的 `--doctor`；不要用别的 Python 检查后就认为配置正确 |
 | `MCP_CONFIG_INVALID` | 修复 `config.toml` 的 TOML 语法后重新运行 `--setup`；配置解析失败时不会改写原文件 |
 | `CACHE_IO_ERROR` | 将 `NSIGHT_CACHE_DIR` 设置为可写且空间充足的目录，检查错误中指出的文件权限，再重试 |

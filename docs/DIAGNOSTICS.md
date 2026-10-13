@@ -1,6 +1,6 @@
-# Official bottleneck diagnostics (1.2.0.dev1)
+# Official bottleneck diagnostics (v1.2.0)
 
-This development extension adds two MCP tools and six fixed NVIDIA expert-system rules. There are twenty tools in this checkout; published v1.1.0 packages contain eighteen and lack this extension. Existing statistics, collection and Compute interfaces remain compatible. [中文指南](DIAGNOSTICS.zh-CN.md).
+v1.2.0 adds two MCP tools and six fixed NVIDIA expert-system rules. There are twenty tools in [v1.2.0](https://github.com/liubingjun1207/nsight-agent/releases/tag/v1.2.0); v1.1.0 packages contain eighteen and lack this extension. Existing statistics, collection and Compute interfaces remain compatible. [中文指南](DIAGNOSTICS.zh-CN.md).
 
 Install from this source checkout with `python -m pip install -e .` using the configured server's virtual-environment Python, then run `python -m nsight_agent --setup` and `--check-connection`. Reconnect Codex. Setup backs up the nsight configuration and installs the packaged analysis skill while preserving custom edits. A GPU is unnecessary for analyzing an existing report.
 
